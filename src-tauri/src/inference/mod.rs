@@ -1,5 +1,7 @@
 pub mod context_manager;
 pub mod metrics;
+pub mod parameters;
+pub mod streaming;
 
 use crate::error::{MinervaError, MinervaResult};
 use std::path::PathBuf;
