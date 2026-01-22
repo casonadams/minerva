@@ -883,7 +883,7 @@ fn test_preload_manager_queue() {
 
 #[test]
 fn test_preload_manager_config() {
-    use minerva_lib::inference::preload_manager::{PreloadConfig, PreloadManager};
+    use minerva_lib::inference::preload_manager::PreloadManager;
 
     let manager =
         PreloadManager::new(minerva_lib::inference::model_registry::ModelRegistry::default());

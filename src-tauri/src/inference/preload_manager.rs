@@ -146,10 +146,10 @@ impl PreloadManager {
         }
 
         // Check rate limiting
-        if let Some(last) = self.last_preload {
-            if last.elapsed().as_millis() < self.config.delay_ms as u128 {
-                return Ok(0);
-            }
+        if let Some(last) = self.last_preload
+            && last.elapsed().as_millis() < self.config.delay_ms as u128
+        {
+            return Ok(0);
         }
 
         let mut processed = 0;

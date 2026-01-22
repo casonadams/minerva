@@ -361,7 +361,7 @@ mod tests {
     #[test]
     fn test_model_metadata_age_seconds() {
         use std::path::PathBuf;
-        let mut metadata = ModelMetadata {
+        let metadata = ModelMetadata {
             id: "test".to_string(),
             path: PathBuf::from("/test/model.gguf"),
             size_mb: 5000,
