@@ -13,6 +13,7 @@ pub mod pattern_detector;
 pub mod preload_manager;
 pub mod streaming;
 pub mod token_stream;
+pub mod tokenizer;
 
 use crate::error::{MinervaError, MinervaResult};
 use std::path::PathBuf;
