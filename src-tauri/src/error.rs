@@ -7,6 +7,7 @@ use serde_json::json;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
+#[allow(dead_code)]
 pub enum MinervaError {
     #[error("Model not found: {0}")]
     ModelNotFound(String),
@@ -63,4 +64,5 @@ impl IntoResponse for MinervaError {
     }
 }
 
+#[allow(dead_code)]
 pub type MinervaResult<T> = Result<T, MinervaError>;

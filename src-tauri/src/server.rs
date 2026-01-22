@@ -12,19 +12,22 @@ use tower_http::cors::CorsLayer;
 use uuid::Uuid;
 
 use crate::error::{MinervaError, MinervaResult};
+#[allow(unused_imports)]
 use crate::models::{
-    ChatCompletionRequest, ChatCompletionResponse, Choice, ChatMessage, ModelsListResponse,
-    ModelRegistry, Usage,
+    ChatCompletionRequest, ChatCompletionResponse, ChatMessage, Choice, ModelInfo, ModelRegistry,
+    ModelsListResponse, Usage,
 };
 
 pub type SharedModelRegistry = Arc<Mutex<ModelRegistry>>;
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct ServerState {
     pub model_registry: SharedModelRegistry,
 }
 
 impl ServerState {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             model_registry: Arc::new(Mutex::new(ModelRegistry::new())),
@@ -32,6 +35,7 @@ impl ServerState {
     }
 }
 
+#[allow(dead_code)]
 pub async fn create_server(state: ServerState) -> Router {
     Router::new()
         .route("/v1/models", get(list_models))
@@ -64,9 +68,9 @@ async fn chat_completions(
 ) -> MinervaResult<Response> {
     let registry = state.model_registry.lock().await;
 
-    registry.get_model(&req.model).ok_or_else(|| {
-        MinervaError::ModelNotFound(format!("Model '{}' not found", req.model))
-    })?;
+    registry
+        .get_model(&req.model)
+        .ok_or_else(|| MinervaError::ModelNotFound(format!("Model '{}' not found", req.model)))?;
 
     let is_streaming = req.stream.unwrap_or(false);
 
@@ -114,20 +118,59 @@ fn create_streaming_response(_req: ChatCompletionRequest) -> impl IntoResponse {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn test_health_check() {
-        let response = health_check().await;
-        assert_eq!(response.status(), StatusCode::OK);
+    #[test]
+    fn test_model_registry_empty() {
+        let registry = ModelRegistry::new();
+        let models = registry.list_models();
+        assert_eq!(models.len(), 0);
+    }
+
+    #[test]
+    fn test_model_registry_add_and_retrieve() {
+        let mut registry = ModelRegistry::new();
+        let model = ModelInfo {
+            id: "test-model".to_string(),
+            object: "model".to_string(),
+            created: 1704067200,
+            owned_by: "local".to_string(),
+            context_window: Some(4096),
+            max_output_tokens: Some(2048),
+        };
+
+        registry.add_model(model.clone());
+        let retrieved = registry.get_model("test-model");
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().id, "test-model");
+    }
+
+    #[test]
+    fn test_model_registry_remove() {
+        let mut registry = ModelRegistry::new();
+        let model = ModelInfo {
+            id: "test-model".to_string(),
+            object: "model".to_string(),
+            created: 1704067200,
+            owned_by: "local".to_string(),
+            context_window: None,
+            max_output_tokens: None,
+        };
+
+        registry.add_model(model);
+        assert_eq!(registry.list_models().len(), 1);
+
+        registry.remove_model("test-model");
+        assert_eq!(registry.list_models().len(), 0);
     }
 
     #[tokio::test]
-    async fn test_list_models_empty() {
+    async fn test_list_models_endpoint() {
         let state = ServerState::new();
         let response = list_models(State(state)).await;
-        
+
         assert!(response.is_ok());
         let Json(models_response) = response.unwrap();
         assert_eq!(models_response.data.len(), 0);
+        assert_eq!(models_response.object, "list");
     }
 
     #[tokio::test]

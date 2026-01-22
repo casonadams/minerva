@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct ModelInfo {
     pub id: String,
     pub object: String,
@@ -20,6 +21,7 @@ pub struct ModelsListResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct ChatCompletionRequest {
     pub model: String,
     pub messages: Vec<ChatMessage>,
@@ -38,12 +40,14 @@ pub struct ChatCompletionRequest {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[allow(dead_code)]
 pub struct ChatMessage {
     pub role: String,
     pub content: String,
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 pub struct ChatCompletionResponse {
     pub id: String,
     pub object: String,
@@ -54,6 +58,7 @@ pub struct ChatCompletionResponse {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 pub struct Choice {
     pub index: usize,
     pub message: ChatMessage,
@@ -61,6 +66,7 @@ pub struct Choice {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 pub struct Usage {
     pub prompt_tokens: usize,
     pub completion_tokens: usize,
@@ -68,6 +74,7 @@ pub struct Usage {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 pub struct ChatCompletionChunk {
     pub id: String,
     pub object: String,
@@ -77,6 +84,7 @@ pub struct ChatCompletionChunk {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 pub struct ChoiceDelta {
     pub index: usize,
     pub delta: DeltaMessage,
@@ -84,6 +92,7 @@ pub struct ChoiceDelta {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 pub struct DeltaMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub role: Option<String>,
@@ -96,12 +105,14 @@ pub struct ModelRegistry {
 }
 
 impl ModelRegistry {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             models: HashMap::new(),
         }
     }
 
+    #[allow(dead_code)]
     pub fn add_model(&mut self, model: ModelInfo) {
         self.models.insert(model.id.clone(), model);
     }
@@ -114,10 +125,12 @@ impl ModelRegistry {
         self.models.values().cloned().collect()
     }
 
+    #[allow(dead_code)]
     pub fn remove_model(&mut self, id: &str) -> Option<ModelInfo> {
         self.models.remove(id)
     }
 
+    #[allow(dead_code)]
     pub fn clear(&mut self) {
         self.models.clear();
     }

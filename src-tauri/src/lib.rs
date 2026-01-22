@@ -1,6 +1,6 @@
-mod server;
-mod models;
 mod error;
+mod models;
+mod server;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
