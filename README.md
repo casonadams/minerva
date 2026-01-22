@@ -136,16 +136,17 @@ invoke('ensure_models_directory')
 - [x] Clear path to real llama.cpp integration
 - See `docs/PHASE_3_5A_COMPLETION.md` for details
 
-**Phase 3.5b: Real llama.cpp Integration** 🔄 IN PROGRESS
-- [x] Step 1: Research llama.cpp crate
+**Phase 3.5b: Real llama.cpp Integration** ✅ COMPLETE
+- [x] Step 1: Research llama.cpp crate (v0.3.2 analysis)
 - [x] Step 2: Real backend implementation with GPU acceleration
-- [ ] Step 3: GPU initialization per platform
-- [ ] Step 4: Token streaming with callbacks
-- [ ] Step 5: Error handling & recovery
-- [ ] Step 6: Performance benchmarking
-- [ ] Step 7: Integration testing
-- [ ] Step 8: Documentation
-- See `docs/PHASE_3_5B_PLAN.md` and `docs/PHASE_3_5B_SESSION_SUMMARY.md`
+- [x] Step 3: GPU initialization (Metal/CUDA per platform)
+- [x] Step 4: Token streaming with callbacks (SSE-ready)
+- [x] Step 5: Error handling & recovery (6 recovery strategies)
+- [x] Step 6: Performance benchmarking (GPU vs CPU metrics)
+- [x] Step 7: Integration testing (7 new real-world tests)
+- [x] Step 8: Documentation (Complete guides)
+- [x] 135 total tests passing (all phases)
+- See `docs/PHASE_3_5B_COMPLETE.md` for full details
 
 ## Configuration
 
@@ -275,7 +276,7 @@ minerva/
 ## Testing
 
 ```bash
-# Run all tests (98 total)
+# Run all tests (135 total)
 pnpm test
 
 # Run with output
@@ -290,17 +291,19 @@ pnpm check:all
 ```
 
 **Test Coverage:**
-- Unit Tests: 80 tests (all modules)
-- Integration Tests: 21 tests (organized by domain)
+- Unit Tests: 101 tests (all modules)
+- Integration Tests: 34 tests (organized by domain)
   - Model discovery (3 tests)
-  - Inference engine (3 tests)
-  - Token streaming (3 tests)
-  - Backend abstraction (3 tests)
+  - Inference engine (5 tests)
+  - Token streaming (5 tests)
+  - Backend abstraction (4 tests)
   - Parameter validation (4 tests)
-  - GPU context (2 tests)
-  - End-to-end pipeline (2 tests)
+  - GPU context (3 tests)
+  - Error recovery (3 tests)
+  - Performance tracking (4 tests)
+  - End-to-end pipeline (3 tests)
 
-Result: **101 tests passing, 0 warnings**
+Result: **135 tests passing, 0 warnings, 0 errors**
 
 **Test Organization:**
 - Unit tests in respective modules (src/*/mod.rs or mod.rs files)
