@@ -454,3 +454,235 @@ fn test_request_summary_logging() {
     assert!(summary.contains("max_tokens=1024"));
     assert!(summary.contains("stream=true"));
 }
+
+/// Test Phase 3.5: Real inference engine lifecycle
+#[test]
+fn test_phase35_llama_engine_lifecycle() {
+    use crate::inference::llama_engine::LlamaEngine;
+
+    let temp_dir = TempDir::new().unwrap();
+    let model_path = temp_dir.path().join("test.gguf");
+    fs::write(&model_path, "dummy").unwrap();
+
+    let mut engine = LlamaEngine::new(model_path);
+    assert!(!engine.is_loaded());
+
+    // Load model
+    assert!(engine.load(2048).is_ok());
+    assert!(engine.is_loaded());
+
+    // Generate response
+    let response = engine.generate("Hello", 100);
+    assert!(response.is_ok());
+    assert!(!response.unwrap().is_empty());
+
+    // Unload model
+    engine.unload();
+    assert!(!engine.is_loaded());
+}
+
+/// Test Phase 3.5: GPU context initialization
+#[test]
+fn test_phase35_gpu_context_detection() {
+    use crate::inference::gpu_context::GpuContext;
+
+    let ctx = GpuContext::new().unwrap_or_default();
+    assert!(ctx.available_memory() > 0);
+    assert_eq!(ctx.allocated_memory(), 0);
+}
+
+/// Test Phase 3.5: GPU memory allocation and deallocation
+#[test]
+fn test_phase35_gpu_memory_management() {
+    use crate::inference::gpu_context::GpuContext;
+
+    let mut ctx = GpuContext::new().unwrap_or_default();
+    let initial_available = ctx.available_memory();
+
+    let alloc_size = 100 * 1024 * 1024; // 100MB
+    assert!(ctx.allocate(alloc_size).is_ok());
+    assert_eq!(ctx.allocated_memory(), alloc_size);
+    assert_eq!(ctx.available_memory(), initial_available - alloc_size);
+
+    assert!(ctx.deallocate(alloc_size).is_ok());
+    assert_eq!(ctx.allocated_memory(), 0);
+    assert_eq!(ctx.available_memory(), initial_available);
+}
+
+/// Test Phase 3.5: Token stream from llama.cpp
+#[test]
+fn test_phase35_token_stream_collection() {
+    use crate::inference::token_stream::TokenStream;
+
+    let stream = TokenStream::new();
+    stream.push_token("Hello".to_string());
+    stream.push_token(" ".to_string());
+    stream.push_token("World".to_string());
+
+    assert_eq!(stream.total_tokens(), 3);
+    assert_eq!(stream.to_string(), "Hello World");
+}
+
+/// Test Phase 3.5: Token stream iteration
+#[test]
+fn test_phase35_token_stream_iteration() {
+    use crate::inference::token_stream::TokenStream;
+
+    let stream = TokenStream::new();
+    stream.push_token("token1".to_string());
+    stream.push_token("token2".to_string());
+
+    let mut stream = stream;
+    assert!(stream.has_next());
+    assert_eq!(stream.position(), 0);
+
+    let t1 = stream.next_token();
+    assert_eq!(t1, Some("token1".to_string()));
+    assert_eq!(stream.position(), 1);
+
+    let t2 = stream.next_token();
+    assert_eq!(t2, Some("token2".to_string()));
+    assert_eq!(stream.position(), 2);
+
+    assert!(!stream.has_next());
+    assert_eq!(stream.next_token(), None);
+}
+
+/// Test Phase 3.5: Token stream reset
+#[test]
+fn test_phase35_token_stream_reset() {
+    use crate::inference::token_stream::TokenStream;
+
+    let stream = TokenStream::new();
+    stream.push_token("test".to_string());
+
+    let mut stream = stream;
+    stream.next_token();
+    assert_eq!(stream.position(), 1);
+
+    stream.reset();
+    assert_eq!(stream.position(), 0);
+    assert!(stream.has_next());
+}
+
+/// Test Phase 3.5: Full inference pipeline with streaming
+#[test]
+fn test_phase35_full_inference_pipeline() {
+    use crate::inference::gpu_context::GpuContext;
+    use crate::inference::llama_engine::LlamaEngine;
+    use crate::inference::token_stream::TokenStream;
+
+    let temp_dir = TempDir::new().unwrap();
+    let model_path = temp_dir.path().join("test.gguf");
+    fs::write(&model_path, "dummy").unwrap();
+
+    // Initialize GPU context
+    let ctx = GpuContext::new().unwrap_or_default();
+    assert!(ctx.available_memory() > 0);
+
+    // Load model with engine
+    let mut engine = LlamaEngine::new(model_path);
+    assert!(engine.load(2048).is_ok());
+
+    // Create token stream for output
+    let stream = TokenStream::new();
+    stream.push_token("This".to_string());
+    stream.push_token(" is".to_string());
+    stream.push_token(" a".to_string());
+    stream.push_token(" response".to_string());
+
+    // Verify stream collection
+    assert_eq!(stream.total_tokens(), 4);
+    let mut stream = stream;
+    let mut collected = String::new();
+    while stream.has_next() {
+        if let Some(token) = stream.next_token() {
+            collected.push_str(&token);
+        }
+    }
+    assert_eq!(collected, "This is a response");
+
+    // Unload
+    engine.unload();
+    assert!(!engine.is_loaded());
+}
+
+/// Test Phase 3.5: Multiple concurrent models with GPU context
+#[test]
+fn test_phase35_multi_model_gpu_context() {
+    use crate::inference::gpu_context::GpuContext;
+    use crate::inference::llama_engine::LlamaEngine;
+
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create multiple models
+    let model1_path = temp_dir.path().join("model1.gguf");
+    let model2_path = temp_dir.path().join("model2.gguf");
+    fs::write(&model1_path, "dummy").unwrap();
+    fs::write(&model2_path, "dummy").unwrap();
+
+    // Initialize shared GPU context
+    let mut gpu_ctx = GpuContext::new().unwrap_or_default();
+    let initial_memory = gpu_ctx.available_memory();
+
+    // Load multiple models
+    let mut engine1 = LlamaEngine::new(model1_path);
+    let mut engine2 = LlamaEngine::new(model2_path);
+
+    assert!(engine1.load(2048).is_ok());
+    assert!(engine2.load(2048).is_ok());
+
+    // Simulate memory allocation
+    let model_size = 500 * 1024 * 1024; // 500MB per model
+    assert!(gpu_ctx.allocate(model_size).is_ok());
+    assert!(gpu_ctx.allocate(model_size).is_ok());
+
+    assert_eq!(gpu_ctx.allocated_memory(), model_size * 2);
+    assert!(gpu_ctx.available_memory() < initial_memory);
+
+    // Generate from both
+    let resp1 = engine1.generate("prompt1", 100);
+    let resp2 = engine2.generate("prompt2", 100);
+
+    assert!(resp1.is_ok());
+    assert!(resp2.is_ok());
+
+    // Cleanup
+    engine1.unload();
+    engine2.unload();
+    gpu_ctx.deallocate(model_size).ok();
+    gpu_ctx.deallocate(model_size).ok();
+    assert_eq!(gpu_ctx.allocated_memory(), 0);
+}
+
+/// Test Phase 3.5: Error handling for out-of-memory
+#[test]
+fn test_phase35_out_of_memory_error() {
+    use crate::inference::gpu_context::GpuContext;
+
+    // Create a context and try to allocate more than available
+    let mut ctx = GpuContext::new().unwrap_or_default();
+    let available = ctx.available_memory();
+
+    // Should fail when trying to allocate more than available
+    let result = ctx.allocate(available + 1);
+    assert!(result.is_err());
+}
+
+/// Test Phase 3.5: Context info retrieval
+#[test]
+fn test_phase35_context_info() {
+    use crate::inference::llama_engine::LlamaEngine;
+
+    let temp_dir = TempDir::new().unwrap();
+    let model_path = temp_dir.path().join("test.gguf");
+    fs::write(&model_path, "dummy").unwrap();
+
+    let mut engine = LlamaEngine::new(model_path.clone());
+    assert!(engine.load(2048).is_ok());
+
+    let info = engine.get_context_info().unwrap();
+    assert_eq!(info.context_size, 2048);
+    assert!(info.thread_count > 0);
+    assert_eq!(info.model_path, model_path);
+}
