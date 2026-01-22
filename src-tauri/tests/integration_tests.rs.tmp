@@ -5,7 +5,6 @@
 //! - Inference pipeline
 //! - Backend abstraction
 //! - Parameter validation
-//! - Phase 4 optimizations (in separate module)
 
 mod integration;
 
@@ -995,3 +994,4 @@ fn test_preload_manager_set_enabled() {
     manager.set_enabled(false);
     assert!(!manager.config().enabled);
 }
+    use minerva_lib::inference::cache_optimizer::SystemMemory;

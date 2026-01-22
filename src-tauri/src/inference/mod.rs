@@ -1,5 +1,7 @@
 pub mod benchmarks;
+pub mod cache_optimizer;
 pub mod context_manager;
+pub mod garbage_collector;
 pub mod gpu_context;
 pub mod llama_adapter;
 pub mod llama_engine;
@@ -7,6 +9,7 @@ pub mod metrics;
 pub mod model_cache;
 pub mod model_registry;
 pub mod parameters;
+pub mod pattern_detector;
 pub mod preload_manager;
 pub mod streaming;
 pub mod token_stream;
