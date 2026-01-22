@@ -1,0 +1,403 @@
+//! Comprehensive integration tests
+//!
+//! These tests verify end-to-end workflows across multiple components:
+//! - Model discovery and registry
+//! - Inference pipeline
+//! - Backend abstraction
+//! - Parameter validation
+
+use minerva_lib::inference::llama_adapter::InferenceBackend;
+use std::fs;
+use tempfile::TempDir;
+
+/// Setup helper: create temporary models directory
+fn setup_test_models_dir() -> (TempDir, std::path::PathBuf) {
+    let temp_dir = TempDir::new().unwrap();
+    let models_dir = temp_dir.path().join("models");
+    fs::create_dir(&models_dir).unwrap();
+    (temp_dir, models_dir)
+}
+
+/// Setup helper: create dummy GGUF files
+fn create_dummy_gguf(dir: &std::path::Path, name: &str) -> std::path::PathBuf {
+    let path = dir.join(format!("{}.gguf", name));
+    fs::write(&path, "GGUF dummy content").unwrap();
+    path
+}
+
+// ============================================================================
+// MODEL DISCOVERY TESTS
+// ============================================================================
+
+#[test]
+fn test_model_discovery_basic() {
+    use minerva_lib::models::loader::ModelLoader;
+
+    let (_temp, models_dir) = setup_test_models_dir();
+    create_dummy_gguf(&models_dir, "model1");
+
+    let loader = ModelLoader::new(models_dir);
+    let discovered = loader.discover_models().unwrap();
+
+    assert_eq!(discovered.len(), 1);
+    assert_eq!(discovered[0].id, "model1");
+}
+
+#[test]
+fn test_model_discovery_multiple() {
+    use minerva_lib::models::loader::ModelLoader;
+
+    let (_temp, models_dir) = setup_test_models_dir();
+    create_dummy_gguf(&models_dir, "model1");
+    create_dummy_gguf(&models_dir, "model2");
+    create_dummy_gguf(&models_dir, "model3");
+
+    let loader = ModelLoader::new(models_dir);
+    let discovered = loader.discover_models().unwrap();
+
+    assert_eq!(discovered.len(), 3);
+}
+
+#[test]
+fn test_model_discovery_filters_non_gguf() {
+    use minerva_lib::models::loader::ModelLoader;
+
+    let (_temp, models_dir) = setup_test_models_dir();
+    create_dummy_gguf(&models_dir, "valid_model");
+    fs::write(models_dir.join("readme.txt"), "text").unwrap();
+    fs::write(models_dir.join("config.json"), "{}").unwrap();
+
+    let loader = ModelLoader::new(models_dir);
+    let discovered = loader.discover_models().unwrap();
+
+    // Only .gguf files
+    assert_eq!(discovered.len(), 1);
+    assert_eq!(discovered[0].id, "valid_model");
+}
+
+#[test]
+fn test_model_registry_discovery() {
+    use minerva_lib::models::ModelRegistry;
+
+    let (_temp, models_dir) = setup_test_models_dir();
+    create_dummy_gguf(&models_dir, "registry_test");
+
+    let mut registry = ModelRegistry::new();
+    let result = registry.discover(&models_dir);
+    assert!(result.is_ok());
+
+    let models = registry.list_models();
+    assert_eq!(models.len(), 1);
+}
+
+// ============================================================================
+// INFERENCE ENGINE TESTS
+// ============================================================================
+
+#[test]
+fn test_inference_engine_lifecycle() {
+    use minerva_lib::inference::llama_engine::LlamaEngine;
+
+    let (_temp, models_dir) = setup_test_models_dir();
+    let model_path = create_dummy_gguf(&models_dir, "engine_test");
+
+    let mut engine = LlamaEngine::new(model_path);
+    assert!(!engine.is_loaded());
+
+    assert!(engine.load(2048).is_ok());
+    assert!(engine.is_loaded());
+
+    engine.unload();
+    assert!(!engine.is_loaded());
+}
+
+#[test]
+fn test_inference_generate_response() {
+    use minerva_lib::inference::llama_engine::LlamaEngine;
+
+    let (_temp, models_dir) = setup_test_models_dir();
+    let model_path = create_dummy_gguf(&models_dir, "gen_test");
+
+    let mut engine = LlamaEngine::new(model_path);
+    assert!(engine.load(2048).is_ok());
+
+    let response = engine.generate("hello world", 100);
+    assert!(response.is_ok());
+    assert!(!response.unwrap().is_empty());
+}
+
+#[test]
+fn test_inference_context_info() {
+    use minerva_lib::inference::llama_engine::LlamaEngine;
+
+    let (_temp, models_dir) = setup_test_models_dir();
+    let model_path = create_dummy_gguf(&models_dir, "ctx_test");
+
+    let mut engine = LlamaEngine::new(model_path.clone());
+    assert!(engine.load(4096).is_ok());
+
+    let info = engine.get_context_info().unwrap();
+    assert_eq!(info.context_size, 4096);
+    assert!(info.thread_count > 0);
+    assert_eq!(info.model_path, model_path);
+}
+
+// ============================================================================
+// TOKEN STREAMING TESTS
+// ============================================================================
+
+#[test]
+fn test_token_stream_collection() {
+    use minerva_lib::inference::token_stream::TokenStream;
+
+    let stream = TokenStream::new();
+    stream.push_token("Hello".to_string());
+    stream.push_token(" ".to_string());
+    stream.push_token("World".to_string());
+
+    assert_eq!(stream.total_tokens(), 3);
+    assert_eq!(stream.to_string(), "Hello World");
+}
+
+#[test]
+fn test_token_stream_iteration() {
+    use minerva_lib::inference::token_stream::TokenStream;
+
+    let stream = TokenStream::new();
+    stream.push_token("a".to_string());
+    stream.push_token("b".to_string());
+    stream.push_token("c".to_string());
+
+    let mut stream = stream;
+    let mut count = 0;
+    while stream.has_next() {
+        let _token = stream.next_token();
+        count += 1;
+    }
+
+    assert_eq!(count, 3);
+    assert_eq!(stream.position(), 3);
+}
+
+#[test]
+fn test_token_stream_reset() {
+    use minerva_lib::inference::token_stream::TokenStream;
+
+    let stream = TokenStream::new();
+    stream.push_token("test".to_string());
+
+    let mut stream = stream;
+    let _t1 = stream.next_token();
+    assert_eq!(stream.position(), 1);
+
+    stream.reset();
+    assert_eq!(stream.position(), 0);
+    assert!(stream.has_next());
+}
+
+// ============================================================================
+// BACKEND ABSTRACTION TESTS
+// ============================================================================
+
+#[test]
+fn test_mock_backend_lifecycle() {
+    use minerva_lib::inference::llama_adapter::{InferenceBackend, MockBackend};
+
+    let (_temp, models_dir) = setup_test_models_dir();
+    let model_path = create_dummy_gguf(&models_dir, "backend_test");
+
+    let mut backend = MockBackend::new();
+    assert!(!backend.is_loaded());
+
+    assert!(backend.load_model(&model_path, 2048).is_ok());
+    assert!(backend.is_loaded());
+    assert_eq!(backend.context_size(), 2048);
+
+    backend.unload_model();
+    assert!(!backend.is_loaded());
+}
+
+#[test]
+fn test_mock_backend_generation() {
+    use minerva_lib::inference::llama_adapter::{InferenceBackend, MockBackend};
+
+    let (_temp, models_dir) = setup_test_models_dir();
+    let model_path = create_dummy_gguf(&models_dir, "gen_backend_test");
+
+    let mut backend = MockBackend::new();
+    assert!(backend.load_model(&model_path, 2048).is_ok());
+
+    let response = backend.generate("hello", 50, 0.7, 0.9).unwrap();
+    assert!(!response.is_empty());
+}
+
+#[test]
+fn test_mock_backend_tokenization() {
+    use minerva_lib::inference::llama_adapter::MockBackend;
+
+    let backend = MockBackend::new();
+
+    let tokens1 = backend.tokenize("hello").unwrap();
+    let tokens2 = backend.tokenize("hello world").unwrap();
+
+    // More tokens for longer input
+    assert!(tokens1.len() < tokens2.len());
+
+    let detok = backend.detokenize(&tokens1).unwrap();
+    assert!(!detok.is_empty());
+    assert!(detok.contains("token"));
+}
+
+// ============================================================================
+// PARAMETER VALIDATION TESTS
+// ============================================================================
+
+#[test]
+fn test_generation_config_validation_valid() {
+    use minerva_lib::inference::GenerationConfig;
+
+    let config = GenerationConfig {
+        temperature: 0.7,
+        top_p: 0.9,
+        top_k: 40,
+        repeat_penalty: 1.1,
+        max_tokens: 512,
+    };
+
+    assert!(config.validate().is_ok());
+}
+
+#[test]
+fn test_generation_config_validation_temperature() {
+    use minerva_lib::inference::GenerationConfig;
+
+    let invalid = GenerationConfig {
+        temperature: 2.5, // Invalid: > 2.0
+        ..GenerationConfig::default()
+    };
+
+    assert!(invalid.validate().is_err());
+}
+
+#[test]
+fn test_generation_config_validation_top_p() {
+    use minerva_lib::inference::GenerationConfig;
+
+    let invalid = GenerationConfig {
+        top_p: 1.5, // Invalid: > 1.0
+        ..GenerationConfig::default()
+    };
+
+    assert!(invalid.validate().is_err());
+}
+
+#[test]
+fn test_generation_config_validation_max_tokens() {
+    use minerva_lib::inference::GenerationConfig;
+
+    let invalid = GenerationConfig {
+        max_tokens: 0, // Invalid: < 1
+        ..GenerationConfig::default()
+    };
+
+    assert!(invalid.validate().is_err());
+}
+
+// ============================================================================
+// GPU CONTEXT TESTS
+// ============================================================================
+
+#[test]
+fn test_gpu_context_creation() {
+    use minerva_lib::inference::gpu_context::GpuContext;
+
+    let ctx = GpuContext::new().unwrap_or_default();
+    assert!(ctx.available_memory() > 0);
+}
+
+#[test]
+fn test_gpu_context_allocation() {
+    use minerva_lib::inference::gpu_context::GpuContext;
+
+    let mut ctx = GpuContext::new().unwrap_or_default();
+    let initial = ctx.allocated_memory();
+
+    let size = 100 * 1024 * 1024; // 100MB
+    assert!(ctx.allocate(size).is_ok());
+    assert_eq!(ctx.allocated_memory(), initial + size);
+
+    assert!(ctx.deallocate(size).is_ok());
+    assert_eq!(ctx.allocated_memory(), initial);
+}
+
+// ============================================================================
+// END-TO-END PIPELINE TESTS
+// ============================================================================
+
+#[test]
+fn test_full_inference_pipeline() {
+    use minerva_lib::inference::llama_engine::LlamaEngine;
+    use minerva_lib::inference::token_stream::TokenStream;
+
+    let (_temp, models_dir) = setup_test_models_dir();
+    let model_path = create_dummy_gguf(&models_dir, "pipeline_test");
+
+    // Create engine
+    let mut engine = LlamaEngine::new(model_path);
+    assert!(engine.load(2048).is_ok());
+
+    // Create stream
+    let stream = TokenStream::new();
+
+    // Generate response
+    let response = engine.generate("test prompt", 100).unwrap();
+
+    // Simulate streaming (split by words)
+    for word in response.split_whitespace() {
+        stream.push_token(format!("{} ", word));
+    }
+
+    // Verify stream
+    let mut stream_iter = stream;
+    let mut collected = String::new();
+    while stream_iter.has_next() {
+        if let Some(token) = stream_iter.next_token() {
+            collected.push_str(&token);
+        }
+    }
+
+    assert!(!collected.is_empty());
+    engine.unload();
+}
+
+#[test]
+fn test_backend_with_streaming() {
+    use minerva_lib::inference::llama_adapter::{InferenceBackend, MockBackend};
+    use minerva_lib::inference::token_stream::TokenStream;
+
+    let (_temp, models_dir) = setup_test_models_dir();
+    let model_path = create_dummy_gguf(&models_dir, "backend_stream_test");
+
+    let mut backend = MockBackend::new();
+    assert!(backend.load_model(&model_path, 2048).is_ok());
+
+    let stream = TokenStream::new();
+    let response = backend.generate("hello", 100, 0.7, 0.9).unwrap();
+
+    // Stream the response
+    for word in response.split_whitespace() {
+        stream.push_token(word.to_string());
+    }
+
+    // Verify
+    assert_eq!(stream.total_tokens(), response.split_whitespace().count());
+
+    let mut stream_iter = stream;
+    let mut count = 0;
+    while stream_iter.has_next() {
+        let _token = stream_iter.next_token();
+        count += 1;
+    }
+
+    assert_eq!(count, response.split_whitespace().count());
+}

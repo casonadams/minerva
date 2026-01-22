@@ -1,12 +1,9 @@
-mod commands;
-mod config;
-mod error;
-mod inference;
-mod models;
-mod server;
-
-#[cfg(test)]
-mod integration_tests;
+pub mod commands;
+pub mod config;
+pub mod error;
+pub mod inference;
+pub mod models;
+pub mod server;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

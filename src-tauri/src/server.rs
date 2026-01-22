@@ -33,7 +33,15 @@ impl ServerState {
             model_registry: Arc::new(Mutex::new(ModelRegistry::new())),
         }
     }
+}
 
+impl Default for ServerState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ServerState {
     /// Create server state and load discovered models
     #[allow(dead_code)]
     pub fn with_discovered_models(models_dir: std::path::PathBuf) -> MinervaResult<Self> {
