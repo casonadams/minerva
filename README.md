@@ -238,8 +238,14 @@ minerva/
 │   │   │   ├── context_manager.rs  # Multi-model management
 │   │   │   ├── parameters.rs       # Request validation
 │   │   │   └── metrics.rs          # Performance tracking
-│   │   └── integration_tests.rs     # 112 comprehensive tests
 │   └── Cargo.toml                  # Rust dependencies
+├── tests/
+│   └── integration_tests.rs         # 21 integration tests (Rust convention)
+│       - model discovery tests
+│       - inference pipeline tests
+│       - backend abstraction tests
+│       - parameter validation tests
+│       - end-to-end workflow tests
 ├── PHASE_3_IMPLEMENTATION.md        # Phase 3 documentation
 ├── PHASE_3_5_IMPLEMENTATION.md      # Phase 3.5 foundation
 ├── PHASE_3_5A_COMPLETION.md         # Phase 3.5a completion
@@ -265,13 +271,24 @@ pnpm check:all
 ```
 
 **Test Coverage:**
-- Phase 1: 5 unit tests
-- Phase 2: 26 tests (model discovery, GGUF parsing, config)
-- Phase 3: 31 tests (inference, streaming, parameters)
-- Phase 3.5: 10 tests (llama engine, GPU, token stream)
-- Integration: 26 end-to-end tests
+- Unit Tests: 80 tests (all modules)
+- Integration Tests: 21 tests (organized by domain)
+  - Model discovery (3 tests)
+  - Inference engine (3 tests)
+  - Token streaming (3 tests)
+  - Backend abstraction (3 tests)
+  - Parameter validation (4 tests)
+  - GPU context (2 tests)
+  - End-to-end pipeline (2 tests)
 
-Result: **98 tests passing, 0 warnings**
+Result: **101 tests passing, 0 warnings**
+
+**Test Organization:**
+- Unit tests in respective modules (src/*/mod.rs or mod.rs files)
+- Integration tests in `tests/integration_tests.rs` (Rust convention)
+- Run all tests: `pnpm test`
+- Run unit tests only: `pnpm test:backend:unit`
+- Run integration tests only: `pnpm test:backend:integration`
 
 ## Contributing
 
