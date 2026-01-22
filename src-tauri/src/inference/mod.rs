@@ -1,3 +1,4 @@
+pub mod benchmarks;
 pub mod context_manager;
 pub mod gpu_context;
 pub mod llama_adapter;
