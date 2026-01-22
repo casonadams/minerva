@@ -529,3 +529,129 @@ fn test_streaming_with_inference_backend() {
     assert_eq!(call_count.load(Ordering::Relaxed), token_count);
     assert_eq!(stream.total_tokens(), token_count);
 }
+
+#[test]
+fn test_error_recovery_gpu_oom() {
+    use minerva_lib::error::MinervaError;
+    use minerva_lib::error_recovery::ErrorRecovery;
+
+    let err = MinervaError::GpuOutOfMemory("16GB limit exceeded".to_string());
+    let strategy = ErrorRecovery::strategy_for(&err);
+
+    // Should trigger fallback to CPU
+    assert!(matches!(
+        strategy,
+        minerva_lib::error_recovery::RecoveryStrategy::FallbackToCpu
+    ));
+    assert!(ErrorRecovery::is_recoverable(&err));
+    assert!(ErrorRecovery::is_resource_exhaustion(&err));
+}
+
+#[test]
+fn test_error_recovery_gpu_context_lost() {
+    use minerva_lib::error::MinervaError;
+    use minerva_lib::error_recovery::ErrorRecovery;
+
+    let err = MinervaError::GpuContextLost("device removed".to_string());
+    let strategy = ErrorRecovery::strategy_for(&err);
+
+    // Should trigger GPU reinitialization
+    assert!(matches!(
+        strategy,
+        minerva_lib::error_recovery::RecoveryStrategy::ReinitializeGpu
+    ));
+    assert!(ErrorRecovery::is_gpu_error(&err));
+}
+
+#[test]
+fn test_error_recovery_model_corrupted() {
+    use minerva_lib::error::MinervaError;
+    use minerva_lib::error_recovery::ErrorRecovery;
+
+    let err = MinervaError::ModelCorrupted("invalid GGUF header".to_string());
+    let strategy = ErrorRecovery::strategy_for(&err);
+
+    // Should trigger model reload
+    assert!(matches!(
+        strategy,
+        minerva_lib::error_recovery::RecoveryStrategy::ReloadModel
+    ));
+}
+
+#[test]
+fn test_performance_metrics_tracking() {
+    use minerva_lib::inference::benchmarks::PerformanceMetrics;
+    use std::time::Duration;
+
+    let metrics = PerformanceMetrics::new(Duration::from_secs(1), 256, 2_000_000, true);
+
+    assert_eq!(metrics.token_count, 256);
+    assert_eq!(metrics.tokens_per_sec, 256.0);
+    assert!(metrics.summary().contains("GPU"));
+    assert!(metrics.summary().contains("256"));
+}
+
+#[test]
+fn test_gpu_vs_cpu_performance_comparison() {
+    use minerva_lib::inference::benchmarks::PerformanceAccumulator;
+    use std::time::Duration;
+
+    let mut accumulator = PerformanceAccumulator::new();
+
+    // Simulate GPU measurements (faster)
+    accumulator.add_gpu_measurement(Duration::from_millis(50));
+    accumulator.add_gpu_measurement(Duration::from_millis(55));
+
+    // Simulate CPU measurements (slower)
+    accumulator.add_cpu_measurement(Duration::from_millis(500));
+    accumulator.add_cpu_measurement(Duration::from_millis(550));
+
+    let speedup = accumulator.speedup_factor().unwrap();
+    assert!(speedup > 5.0); // GPU should be ~10x faster
+    assert_eq!(accumulator.gpu_count(), 2);
+    assert_eq!(accumulator.cpu_count(), 2);
+}
+
+#[test]
+fn test_full_inference_with_error_handling() {
+    use minerva_lib::error_recovery::ErrorRecovery;
+    use minerva_lib::inference::llama_adapter::{InferenceBackend, MockBackend};
+
+    let (_temp, models_dir) = setup_test_models_dir();
+    let model_path = create_dummy_gguf(&models_dir, "full_inference_test");
+
+    let mut backend = MockBackend::new();
+
+    // Test successful load
+    assert!(backend.load_model(&model_path, 2048).is_ok());
+    assert!(backend.is_loaded());
+
+    // Test successful generation
+    let result = backend.generate("test prompt", 100, 0.7, 0.9);
+    assert!(result.is_ok());
+
+    // Verify no recoverable errors
+    if let Err(err) = result {
+        assert!(ErrorRecovery::is_recoverable(&err));
+    }
+}
+
+#[test]
+fn test_context_exceeds_limits() {
+    use minerva_lib::error::MinervaError;
+    use minerva_lib::error_recovery::ErrorRecovery;
+
+    let err = MinervaError::ContextLimitExceeded {
+        max: 2048,
+        required: 4096,
+    };
+
+    let strategy = ErrorRecovery::strategy_for(&err);
+    // ContextLimitExceeded is fatal - cannot be recovered
+    assert!(matches!(
+        strategy,
+        minerva_lib::error_recovery::RecoveryStrategy::Fatal
+    ));
+    // But it's still technically recoverable (not in the non-recoverable list)
+    assert!(ErrorRecovery::is_recoverable(&err));
+}
