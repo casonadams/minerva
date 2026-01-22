@@ -36,8 +36,8 @@ pub enum MinervaError {
     #[error("Generation timeout")]
     GenerationTimeout,
 
-    #[error("Out of memory")]
-    OutOfMemory,
+    #[error("Out of memory: {0}")]
+    OutOfMemory(String),
 }
 
 impl IntoResponse for MinervaError {
@@ -66,11 +66,9 @@ impl IntoResponse for MinervaError {
                 "generation_timeout",
                 "Generation request timed out".to_string(),
             ),
-            MinervaError::OutOfMemory => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "out_of_memory",
-                "Out of memory during inference".to_string(),
-            ),
+            MinervaError::OutOfMemory(msg) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "out_of_memory", msg)
+            }
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "server_error",

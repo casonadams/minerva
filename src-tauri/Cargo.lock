@@ -2206,6 +2206,7 @@ dependencies = [
  "gguf-rs-lib",
  "home",
  "llama_cpp",
+ "num_cpus",
  "parking_lot",
  "serde",
  "serde_json",
