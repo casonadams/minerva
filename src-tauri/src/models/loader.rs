@@ -1,5 +1,5 @@
 use crate::error::{MinervaError, MinervaResult};
-use crate::models::ModelInfo;
+use crate::models::{ModelInfo, gguf_parser::GGUFParser};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -57,16 +57,23 @@ impl ModelLoader {
             .ok_or_else(|| MinervaError::ModelLoadingError("Invalid model filename".to_string()))?
             .to_string();
 
-        // Get file metadata
-        let _metadata = std::fs::metadata(path).map_err(MinervaError::IoError)?;
+        // Parse GGUF metadata
+        let gguf_metadata = GGUFParser::parse_metadata(path).unwrap_or_else(|e| {
+            tracing::warn!(
+                "Failed to parse GGUF metadata for {}: {}",
+                path.display(),
+                e
+            );
+            Default::default()
+        });
 
-        // Create model info
+        // Create model info with parsed metadata
         let model_info = ModelInfo {
             id: file_name.clone(),
             object: "model".to_string(),
             created: chrono::Utc::now().timestamp(),
             owned_by: "local".to_string(),
-            context_window: Some(4096), // Default, can be enhanced with GGUF parsing
+            context_window: gguf_metadata.context_window.or(Some(4096)),
             max_output_tokens: Some(2048),
         };
 
