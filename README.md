@@ -241,15 +241,20 @@ minerva/
 │   │   │   ├── loader.rs        # GGUF discovery
 │   │   │   └── gguf_parser.rs   # GGUF binary parsing
 │   │   ├── inference/
-│   │   │   ├── mod.rs              # Inference infrastructure
-│   │   │   ├── llama_engine.rs     # Real inference wrapper
-│   │   │   ├── llama_adapter.rs    # Backend abstraction layer
-│   │   │   ├── gpu_context.rs      # GPU memory management
-│   │   │   ├── token_stream.rs     # Token collection
-│   │   │   ├── streaming.rs        # SSE formatting
-│   │   │   ├── context_manager.rs  # Multi-model management
-│   │   │   ├── parameters.rs       # Request validation
-│   │   │   └── metrics.rs          # Performance tracking
+│   │   │   ├── mod.rs                   # Inference infrastructure
+│   │   │   ├── llama_engine.rs          # Real inference wrapper
+│   │   │   ├── llama_adapter.rs         # Backend abstraction layer
+│   │   │   ├── gpu_context.rs           # GPU memory management
+│   │   │   ├── token_stream.rs          # Token collection & streaming
+│   │   │   ├── streaming.rs             # SSE formatting
+│   │   │   ├── context_manager.rs       # Multi-model management (Phase 4 Step 1)
+│   │   │   ├── model_cache.rs           # Model caching with eviction (Phase 4 Step 1)
+│   │   │   ├── model_registry.rs        # Model metadata tracking (Phase 4 Step 2)
+│   │   │   ├── preload_manager.rs       # Intelligent preloading (Phase 4 Step 2)
+│   │   │   ├── parameters.rs            # Request validation
+│   │   │   ├── metrics.rs               # Performance tracking
+│   │   │   ├── benchmarks.rs            # Performance benchmarking
+│   │   │   └── error_recovery.rs        # Error handling strategies
 │   └── Cargo.toml                  # Rust dependencies
 ├── tests/
 │   └── integration_tests.rs         # 21 integration tests (Rust convention)
@@ -291,8 +296,8 @@ pnpm check:all
 ```
 
 **Test Coverage:**
-- Unit Tests: 101 tests (all modules)
-- Integration Tests: 34 tests (organized by domain)
+- Unit Tests: 152 tests (all modules)
+- Integration Tests: 69 tests (organized by domain)
   - Model discovery (3 tests)
   - Inference engine (5 tests)
   - Token streaming (5 tests)
@@ -302,8 +307,10 @@ pnpm check:all
   - Error recovery (3 tests)
   - Performance tracking (4 tests)
   - End-to-end pipeline (3 tests)
+  - Multi-model support (13 tests) - Phase 4 Step 1
+  - Model registry & preloading (22 tests) - Phase 4 Step 2
 
-Result: **135 tests passing, 0 warnings, 0 errors**
+Result: **221 tests passing, 0 warnings, 0 errors**
 
 **Test Organization:**
 - Unit tests in respective modules (src/*/mod.rs or mod.rs files)
@@ -311,6 +318,18 @@ Result: **135 tests passing, 0 warnings, 0 errors**
 - Run all tests: `pnpm test`
 - Run unit tests only: `pnpm test:backend:unit`
 - Run integration tests only: `pnpm test:backend:integration`
+
+**Current Progress:**
+- Phase 1: Foundation ✅ COMPLETE
+- Phase 2: Model Loading ✅ COMPLETE
+- Phase 3: Inference Engine ✅ COMPLETE
+- Phase 3.5: Real LLM Integration ✅ COMPLETE
+- Phase 3.5a: Backend Abstraction ✅ COMPLETE
+- Phase 3.5b: Real llama.cpp Integration ✅ COMPLETE
+- Phase 4: Advanced Features (25% complete)
+  - Step 1: Multi-model Support ✅ COMPLETE
+  - Step 2: Model Caching & Preloading ✅ COMPLETE
+  - Steps 3-8: In Progress
 
 ## Contributing
 
