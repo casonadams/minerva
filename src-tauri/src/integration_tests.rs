@@ -686,3 +686,183 @@ fn test_phase35_context_info() {
     assert!(info.thread_count > 0);
     assert_eq!(info.model_path, model_path);
 }
+
+/// Test Phase 3.5a: Backend abstraction layer with MockBackend
+#[test]
+fn test_phase35a_mock_backend_interface() {
+    use crate::inference::llama_adapter::{InferenceBackend, MockBackend};
+
+    let temp_dir = TempDir::new().unwrap();
+    let model_path = temp_dir.path().join("test.gguf");
+    fs::write(&model_path, "dummy").unwrap();
+
+    let mut backend = MockBackend::new();
+    assert!(!backend.is_loaded());
+
+    // Load
+    assert!(backend.load_model(&model_path, 2048).is_ok());
+    assert!(backend.is_loaded());
+    assert_eq!(backend.context_size(), 2048);
+
+    // Generate
+    let response = backend.generate("hello", 50, 0.7, 0.9).unwrap();
+    assert!(!response.is_empty());
+
+    // Tokenize/Detokenize
+    let tokens = backend.tokenize("hello world").unwrap();
+    assert!(!tokens.is_empty());
+    let detokenized = backend.detokenize(&tokens).unwrap();
+    assert!(!detokenized.is_empty());
+
+    // Unload
+    backend.unload_model();
+    assert!(!backend.is_loaded());
+}
+
+/// Test Phase 3.5a: Inference backend switching
+#[test]
+fn test_phase35a_backend_agnostic_generation() {
+    use crate::inference::llama_adapter::{InferenceBackend, MockBackend};
+
+    let temp_dir = TempDir::new().unwrap();
+    let model_path = temp_dir.path().join("test.gguf");
+    fs::write(&model_path, "dummy").unwrap();
+
+    // Create backend trait objects to test polymorphism
+    let backends: Vec<Box<dyn InferenceBackend>> = vec![Box::new(MockBackend::new())];
+
+    for backend in backends {
+        let mut backend = backend;
+        // Each backend should support the same interface
+        assert!(backend.load_model(&model_path, 2048).is_ok());
+        assert!(backend.is_loaded());
+
+        let response = backend.generate("hello", 100, 0.7, 0.9);
+        assert!(response.is_ok());
+
+        backend.unload_model();
+        assert!(!backend.is_loaded());
+    }
+}
+
+/// Test Phase 3.5a: Intelligent mocking responses
+#[test]
+fn test_phase35a_intelligent_mock_responses() {
+    use crate::inference::llama_adapter::{InferenceBackend, MockBackend};
+
+    let temp_dir = TempDir::new().unwrap();
+    let model_path = temp_dir.path().join("test.gguf");
+    fs::write(&model_path, "dummy").unwrap();
+
+    let mut backend = MockBackend::new();
+    assert!(backend.load_model(&model_path, 2048).is_ok());
+
+    // Test different prompt types get responses
+    let hello_resp = backend.generate("hello", 100, 0.7, 0.9).unwrap();
+    let analyze_resp = backend
+        .generate("analyze this problem", 100, 0.7, 0.9)
+        .unwrap();
+    let why_resp = backend.generate("why is that", 100, 0.7, 0.9).unwrap();
+    let describe_resp = backend
+        .generate("describe the concept", 100, 0.7, 0.9)
+        .unwrap();
+
+    // All should be non-empty
+    assert!(!hello_resp.is_empty());
+    assert!(!analyze_resp.is_empty());
+    assert!(!why_resp.is_empty());
+    assert!(!describe_resp.is_empty());
+
+    // Check for expected patterns (not strict equality since responses can be long)
+    assert!(hello_resp.len() > 10);
+    assert!(analyze_resp.len() > 10);
+    assert!(why_resp.len() > 10);
+    assert!(describe_resp.len() > 10);
+}
+
+/// Test Phase 3.5a: Backend parameter handling
+#[test]
+fn test_phase35a_backend_parameters() {
+    use crate::inference::llama_adapter::{InferenceBackend, MockBackend};
+
+    let temp_dir = TempDir::new().unwrap();
+    let model_path = temp_dir.path().join("test.gguf");
+    fs::write(&model_path, "dummy").unwrap();
+
+    let mut backend = MockBackend::new();
+    assert!(backend.load_model(&model_path, 2048).is_ok());
+
+    // Test different temperature/top_p values
+    let resp_low_temp = backend.generate("hello", 50, 0.1, 0.9).unwrap();
+    let resp_high_temp = backend.generate("hello", 50, 1.5, 0.9).unwrap();
+    let resp_low_p = backend.generate("hello", 50, 0.7, 0.5).unwrap();
+    let resp_high_p = backend.generate("hello", 50, 0.7, 0.99).unwrap();
+
+    // All should complete without error
+    assert!(!resp_low_temp.is_empty());
+    assert!(!resp_high_temp.is_empty());
+    assert!(!resp_low_p.is_empty());
+    assert!(!resp_high_p.is_empty());
+}
+
+/// Test Phase 3.5a: Backend tokenization
+#[test]
+fn test_phase35a_backend_tokenization() {
+    use crate::inference::llama_adapter::{InferenceBackend, MockBackend};
+
+    let backend = MockBackend::new();
+
+    // Tokenize various inputs
+    let tokens1 = backend.tokenize("hello").unwrap();
+    let tokens2 = backend.tokenize("hello world").unwrap();
+    let tokens3 = backend.tokenize("hello world test").unwrap();
+
+    // More words = more tokens (approximately)
+    assert!(tokens1.len() < tokens2.len());
+    assert!(tokens2.len() < tokens3.len());
+
+    // Detokenize
+    let detok = backend.detokenize(&tokens1).unwrap();
+    assert!(!detok.is_empty());
+}
+
+/// Test Phase 3.5a: Complete inference pipeline with backend
+#[test]
+fn test_phase35a_full_pipeline_with_backend() {
+    use crate::inference::llama_adapter::{InferenceBackend, MockBackend};
+    use crate::inference::token_stream::TokenStream;
+
+    let temp_dir = TempDir::new().unwrap();
+    let model_path = temp_dir.path().join("test.gguf");
+    fs::write(&model_path, "dummy").unwrap();
+
+    let mut backend = MockBackend::new();
+    let stream = TokenStream::new();
+
+    // Load
+    assert!(backend.load_model(&model_path, 2048).is_ok());
+
+    // Generate with streaming
+    let prompt = "What is machine learning?";
+    let response = backend.generate(prompt, 100, 0.7, 0.9).unwrap();
+
+    // Simulate token streaming
+    for word in response.split_whitespace() {
+        stream.push_token(format!("{} ", word));
+    }
+
+    // Verify stream collected all tokens
+    assert_eq!(stream.total_tokens(), response.split_whitespace().count());
+
+    // Iterate through stream
+    let mut stream_iter = stream;
+    let mut collected = String::new();
+    while stream_iter.has_next() {
+        if let Some(token) = stream_iter.next_token() {
+            collected.push_str(&token);
+        }
+    }
+
+    assert!(!collected.is_empty());
+    assert_eq!(stream_iter.position(), response.split_whitespace().count());
+}
