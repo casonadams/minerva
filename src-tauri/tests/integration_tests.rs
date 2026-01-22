@@ -791,3 +791,204 @@ fn test_preload_strategy_enum() {
     assert!(matches!(lazy, PreloadStrategy::Lazy));
     assert!(matches!(scheduled, PreloadStrategy::Scheduled));
 }
+
+// Model registry and preloading tests (Phase 4 Step 2)
+
+#[test]
+fn test_model_registry_creation() {
+    use minerva_lib::inference::model_registry::ModelRegistry;
+
+    let registry = ModelRegistry::new();
+    assert!(registry.list().is_empty());
+    assert_eq!(registry.cached_size_mb(), 0);
+}
+
+#[test]
+fn test_model_registry_default() {
+    use minerva_lib::inference::model_registry::ModelRegistry;
+
+    let registry = ModelRegistry::default();
+    assert_eq!(registry.list().len(), 0);
+    assert_eq!(registry.list_cached().len(), 0);
+}
+
+#[test]
+fn test_model_registry_cache_usage() {
+    use minerva_lib::inference::model_registry::ModelRegistry;
+
+    let registry = ModelRegistry::new();
+    assert_eq!(registry.cache_usage_percent(), 0.0);
+}
+
+#[test]
+fn test_model_registry_max_cache_size() {
+    use minerva_lib::inference::model_registry::ModelRegistry;
+
+    let mut registry = ModelRegistry::new();
+    registry.set_max_cache_size(10000);
+
+    assert!(!registry.would_exceed_limit(5000)); // Within limit
+    assert!(registry.would_exceed_limit(10001)); // Exceeds limit
+    assert!(!registry.would_exceed_limit(9999)); // Within limit
+}
+
+#[test]
+fn test_model_registry_oldest_cached() {
+    use minerva_lib::inference::model_registry::ModelRegistry;
+
+    let registry = ModelRegistry::new();
+    assert!(registry.oldest_cached().is_empty());
+}
+
+#[test]
+fn test_model_registry_least_used() {
+    use minerva_lib::inference::model_registry::ModelRegistry;
+
+    let registry = ModelRegistry::new();
+    assert!(registry.least_used_cached().is_empty());
+}
+
+#[test]
+fn test_model_registry_remove() {
+    use minerva_lib::inference::model_registry::ModelRegistry;
+
+    let mut registry = ModelRegistry::new();
+    assert!(registry.remove("nonexistent").is_none());
+}
+
+#[test]
+fn test_model_registry_clear() {
+    use minerva_lib::inference::model_registry::ModelRegistry;
+
+    let mut registry = ModelRegistry::new();
+    registry.clear();
+    assert!(registry.list().is_empty());
+}
+
+#[test]
+fn test_preload_manager_creation() {
+    use minerva_lib::inference::preload_manager::PreloadManager;
+
+    let manager = PreloadManager::default();
+    assert_eq!(manager.queue_size(), 0);
+}
+
+#[test]
+fn test_preload_manager_queue() {
+    use minerva_lib::inference::preload_manager::PreloadManager;
+
+    let manager = PreloadManager::default();
+    assert!(manager.queue_list().is_empty());
+}
+
+#[test]
+fn test_preload_manager_config() {
+    use minerva_lib::inference::preload_manager::{PreloadConfig, PreloadManager};
+
+    let manager =
+        PreloadManager::new(minerva_lib::inference::model_registry::ModelRegistry::default());
+    let config = manager.config();
+    assert!(config.enabled);
+}
+
+#[test]
+fn test_preload_manager_clear_queue() {
+    use minerva_lib::inference::preload_manager::PreloadManager;
+
+    let mut manager = PreloadManager::default();
+    manager.clear_queue();
+    assert_eq!(manager.queue_size(), 0);
+}
+
+#[test]
+fn test_preload_manager_stats() {
+    use minerva_lib::inference::preload_manager::PreloadManager;
+
+    let manager = PreloadManager::default();
+    let stats = manager.stats();
+    assert_eq!(stats.total_preloaded, 0);
+    assert_eq!(stats.success_rate(), 0.0);
+}
+
+#[test]
+fn test_preload_manager_reset_stats() {
+    use minerva_lib::inference::preload_manager::PreloadManager;
+
+    let mut manager = PreloadManager::default();
+    manager.reset_stats();
+    assert_eq!(manager.stats().total_preloaded, 0);
+}
+
+#[test]
+fn test_preload_config_default() {
+    use minerva_lib::inference::preload_manager::PreloadConfig;
+
+    let config = PreloadConfig::default();
+    assert!(config.enabled);
+    assert_eq!(config.batch_size, 1);
+}
+
+#[test]
+fn test_preload_strategy_sequential() {
+    use minerva_lib::inference::preload_manager::PreloadStrategy;
+
+    let strategy = PreloadStrategy::Sequential;
+    assert!(matches!(strategy, PreloadStrategy::Sequential));
+}
+
+#[test]
+fn test_preload_strategy_frequency() {
+    use minerva_lib::inference::preload_manager::PreloadStrategy;
+
+    let strategy = PreloadStrategy::Frequency;
+    assert!(matches!(strategy, PreloadStrategy::Frequency));
+}
+
+#[test]
+fn test_preload_strategy_recency() {
+    use minerva_lib::inference::preload_manager::PreloadStrategy;
+
+    let strategy = PreloadStrategy::Recency;
+    assert!(matches!(strategy, PreloadStrategy::Recency));
+}
+
+#[test]
+fn test_preload_strategy_size() {
+    use minerva_lib::inference::preload_manager::PreloadStrategy;
+
+    let strategy = PreloadStrategy::Size;
+    assert!(matches!(strategy, PreloadStrategy::Size));
+}
+
+#[test]
+fn test_preload_stats_calculation() {
+    use minerva_lib::inference::preload_manager::PreloadStats;
+
+    let stats = PreloadStats {
+        total_preloaded: 10,
+        successful: 9,
+        failed: 1,
+        skipped: 0,
+        total_time_ms: 900,
+    };
+
+    assert_eq!(stats.success_rate(), 90.0);
+    assert_eq!(stats.avg_time_ms(), 100.0);
+}
+
+#[test]
+fn test_model_registry_get_nonexistent() {
+    use minerva_lib::inference::model_registry::ModelRegistry;
+
+    let registry = ModelRegistry::new();
+    assert!(registry.get("nonexistent").is_none());
+}
+
+#[test]
+fn test_preload_manager_set_enabled() {
+    use minerva_lib::inference::preload_manager::PreloadManager;
+
+    let mut manager = PreloadManager::default();
+    manager.set_enabled(false);
+    assert!(!manager.config().enabled);
+}

@@ -5,6 +5,8 @@ pub mod llama_adapter;
 pub mod llama_engine;
 pub mod metrics;
 pub mod model_cache;
+pub mod model_registry;
+pub mod preload_manager;
 pub mod parameters;
 pub mod streaming;
 pub mod token_stream;
