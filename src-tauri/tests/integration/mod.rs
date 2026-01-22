@@ -1,4 +1,15 @@
+// Phase 4 Step 3: Advanced Parameter Tuning & Optimization
 pub mod phase4_step3;
+
+// Phases 1-3.5: Core Functionality
+pub mod error_recovery_e2e;
+pub mod gpu_and_parameters; // GPU context and parameter validation
+pub mod inference_engine; // Inference engine lifecycle
+pub mod model_discovery; // Model discovery and registry
+pub mod streaming; // Token streaming and backend abstraction // Error recovery and end-to-end tests
+
+// Phase 4 Steps 1-2: Multi-Model Support
+pub mod multimodel_support; // Multi-model caching and preloading
 
 use std::fs;
 use std::path::{Path, PathBuf};
