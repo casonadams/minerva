@@ -1,5 +1,6 @@
 pub mod context_manager;
 pub mod gpu_context;
+pub mod llama_adapter;
 pub mod llama_engine;
 pub mod metrics;
 pub mod parameters;
