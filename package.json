@@ -22,8 +22,10 @@
     "fmt": "pnpm fmt:backend && pnpm fmt:frontend",
     "fmt:backend": "cd src-tauri && cargo fmt && cd ..",
     "fmt:backend:check": "cd src-tauri && cargo fmt -- --check && cd ..",
-    "fmt:frontend": "echo 'Frontend formatting via prettier can be added later'",
-    "fmt:check": "pnpm fmt:backend:check",
+    "fmt:frontend": "prettier --write 'src/**/*.{svelte,ts,tsx,js,json}'",
+    "fmt:frontend:check": "prettier --check 'src/**/*.{svelte,ts,tsx,js,json}'",
+    "fmt:all": "pnpm fmt:backend && pnpm fmt:frontend",
+    "fmt:check": "pnpm fmt:backend:check && pnpm fmt:frontend:check",
     "check:all": "pnpm check:frontend && pnpm lint:backend && pnpm fmt:backend:check",
     "check:backend": "cd src-tauri && cargo check && cd ..",
     "build:backend": "cd src-tauri && cargo build && cd ..",
@@ -42,6 +44,8 @@
     "svelte-check": "^4.0.0",
     "typescript": "~5.6.2",
     "vite": "^6.0.3",
-    "@tauri-apps/cli": "^2"
+    "@tauri-apps/cli": "^2",
+    "prettier": "^3.0.0",
+    "prettier-plugin-svelte": "^3.0.0"
   }
 }

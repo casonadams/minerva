@@ -6,23 +6,25 @@ All development tasks can be run with simple `pnpm` commands. Scripts handle bot
 
 ```bash
 # Testing
-pnpm test               # Run all tests
-pnpm test:backend:watch # Watch mode tests
+pnpm test               # Run all tests (46 tests currently)
+pnpm test:backend:watch # Watch mode tests with output
 
-# Linting
-pnpm lint               # Lint everything
-pnpm lint:backend:fix   # Auto-fix warnings
+# Linting & Code Quality
+pnpm lint               # Lint everything (strict mode)
+pnpm lint:backend:fix   # Auto-fix Rust warnings
 
-# Formatting
-pnpm fmt                # Format all code
-pnpm fmt:check          # Check without changes
+# Formatting (both Rust and Frontend)
+pnpm fmt                # Format all code automatically
+pnpm fmt:check          # Check formatting without changes
+pnpm fmt:backend        # Format Rust only (rustfmt)
+pnpm fmt:frontend       # Format TypeScript/Svelte (Prettier)
 
 # Validation (Run Before Commit)
-pnpm check:all
-pnpm test
+pnpm check:all          # Full validation
+pnpm test               # All tests
 
 # Building
-pnpm tauri dev          # Development mode
+pnpm tauri dev              # Development mode
 pnpm tauri build --release  # Production build
 ```
 
@@ -66,14 +68,25 @@ All Clippy warnings are treated as errors (`-D warnings`). This ensures high cod
 | Script | Purpose | Coverage | Time |
 |--------|---------|----------|------|
 | `pnpm fmt` | Format all code | Rust + Frontend | ~2s |
+| `pnpm fmt:all` | Explicit format all | Rust + Frontend | ~2s |
 | `pnpm fmt:backend` | Format Rust only | rustfmt | ~1s |
-| `pnpm fmt:backend:check` | Check format | Rust only | ~1s |
-| `pnpm fmt:check` | Check all format | All languages | ~2s |
-| `pnpm fmt:frontend` | Placeholder | Ready for prettier | instant |
+| `pnpm fmt:backend:check` | Check Rust format | rustfmt check | ~1s |
+| `pnpm fmt:frontend` | Format TypeScript/Svelte | Prettier | ~1s |
+| `pnpm fmt:frontend:check` | Check frontend format | Prettier check | ~1s |
+| `pnpm fmt:check` | Check all formatting | Rust + Frontend | ~2s |
 
-**Auto-formatting:**
+**Auto-formatting all code:**
 ```bash
-pnpm fmt  # Automatically fixes formatting issues
+pnpm fmt  # Automatically fixes both Rust and Frontend formatting
+
+# Or be explicit
+pnpm fmt:backend   # Format Rust code only (rustfmt)
+pnpm fmt:frontend  # Format TS/Svelte code (Prettier)
+
+# Check without making changes
+pnpm fmt:check     # Check all
+pnpm fmt:backend:check   # Check Rust only
+pnpm fmt:frontend:check  # Check Frontend only
 ```
 
 ### Comprehensive Checks
@@ -120,9 +133,13 @@ pnpm tauri dev
 # Terminal 2: Watch tests
 pnpm test:backend:watch
 
-# Terminal 3: When you want to check something
-pnpm lint:backend
+# Terminal 3: Monitor code quality
+# First run format to auto-fix code
 pnpm fmt
+
+# Then check quality
+pnpm lint
+pnpm check:frontend
 ```
 
 ### Before Committing
@@ -193,25 +210,27 @@ pnpm check:frontend
 
 ### Tests
 ```
-✅ 5/5 tests passing
-✅ Model registry tests
-✅ Endpoint tests
-✅ Error handling tests
+✅ 46/46 tests passing
+✅ Phase 2: 26 model discovery tests
+✅ Phase 3: 20 inference engine tests
+✅ Error handling and edge cases covered
 ```
 
 ### Linting
 ```
-✅ 0 Clippy warnings (strict mode)
+✅ 0 Clippy warnings (strict mode: -D warnings)
 ✅ 0 TypeScript errors
 ✅ 0 Svelte errors
+✅ 0 Prettier formatting issues
 ```
 
 ### Code Quality
 ```
-✅ Properly formatted
-✅ SOLID principles
+✅ All code properly formatted (rustfmt + Prettier)
+✅ SOLID principles enforced
 ✅ All functions ≤ 25 lines
-✅ Cyclomatic complexity ≤ 3
+✅ Cyclomatic complexity ≤ 3 per function
+✅ File size ≤ 350 lines (modular architecture)
 ```
 
 ## Troubleshooting
@@ -239,11 +258,19 @@ pnpm lint:backend
 ### Format Issues
 
 ```bash
-# Auto-format everything
+# Auto-format everything (both Rust and Frontend)
 pnpm fmt
 
-# Check what would change
+# Check what would change without modifying
+pnpm fmt:check
+
+# Format specific languages
+pnpm fmt:backend   # Rust only (rustfmt)
+pnpm fmt:frontend  # TypeScript/Svelte (Prettier)
+
+# Check specific languages without modifying
 pnpm fmt:backend:check
+pnpm fmt:frontend:check
 ```
 
 ### Port Already in Use

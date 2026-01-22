@@ -1,0 +1,9 @@
+node_modules
+dist
+build
+src-tauri
+.svelte-kit
+target
+*.wasm
+.git
+pnpm-lock.yaml
