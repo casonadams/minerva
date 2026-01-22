@@ -1,3 +1,4 @@
+pub mod batch;
 pub mod benchmarks;
 pub mod cache_optimizer;
 pub mod context_manager;

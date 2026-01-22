@@ -4,6 +4,9 @@ pub mod phase4_step3;
 // Phase 4 Step 4: Real Tokenization and Vocabulary
 pub mod tokenization; // Real tokenization and vocabulary support
 
+// Phase 4 Step 6: Batch Processing
+pub mod batch_processing; // Batch processing for tokenization and inference
+
 // Phases 1-3.5: Core Functionality
 pub mod error_recovery_e2e;
 pub mod gpu_and_parameters; // GPU context and parameter validation
