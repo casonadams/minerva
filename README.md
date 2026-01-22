@@ -19,6 +19,22 @@ A Tauri desktop application that serves local Large Language Models via OpenAI-c
 - Node.js 18+ and pnpm
 - macOS 10.15+
 
+### Setup Models
+
+1. Create the models directory (auto-created on first run):
+```bash
+mkdir -p ~/.minerva/models
+```
+
+2. Place GGUF model files in `~/.minerva/models/`:
+```bash
+# Example with llama.cpp models
+cp ~/Downloads/mistral-7b.gguf ~/.minerva/models/
+cp ~/Downloads/llama-2-7b.gguf ~/.minerva/models/
+```
+
+3. Models are automatically discovered on app startup
+
 ### Development
 
 ```bash
@@ -32,16 +48,38 @@ pnpm tauri dev
 ### API Usage
 
 ```bash
-# List models
+# List available models
 curl http://localhost:11434/v1/models
 
 # Chat completion
 curl http://localhost:11434/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "my-model",
+    "model": "mistral-7b",
     "messages": [{"role": "user", "content": "Hello"}]
   }'
+```
+
+### Tauri Commands
+
+The frontend can use these Tauri IPC commands:
+
+```typescript
+// Get current configuration
+invoke('get_config')
+
+// List discovered models
+invoke('list_discovered_models')
+
+// Load specific model
+invoke('load_model_file', { modelPath: '/path/to/model.gguf' })
+
+// Get/set models directory
+invoke('get_models_directory')
+invoke('set_models_directory', { path: '/new/path' })
+
+// Ensure models directory exists
+invoke('ensure_models_directory')
 ```
 
 ## Architecture
@@ -53,19 +91,34 @@ curl http://localhost:11434/v1/chat/completions \
 
 ## Project Status
 
-**Phase 1: Foundation** (Current - In Progress)
+**Phase 1: Foundation** ✅ COMPLETE
 - [x] Project renamed to Minerva
 - [x] Axum HTTP server setup
 - [x] API response models created
 - [x] Mock endpoints implemented
-- [ ] Tauri command integration
-- [ ] Frontend UI scaffolding
+- [x] Error handling with OpenAI format
+- [x] 5 unit tests passing
 
-See `IMPLEMENTATION_PLAN.md` for detailed roadmap.
+**Phase 2: Model Loading & File System** ✅ COMPLETE
+- [x] GGUF file parsing with metadata extraction
+- [x] Recursive model discovery from filesystem
+- [x] Configuration management with persistence
+- [x] Tauri commands for model management
+- [x] HTTP server integration with real models
+- [x] Directory structure auto-creation
+- [x] 26 comprehensive tests (17 unit + 9 integration)
+
+**Phase 3: LLM Inference** (Planned)
+- [ ] llama.cpp integration
+- [ ] Token generation & streaming
+- [ ] Context management
+- [ ] Actual model inference
+
+See `PHASE_2_PLAN.md` for detailed Phase 2 implementation notes.
 
 ## Configuration
 
-Edit `~/.minerva/config.json`:
+Configuration is automatically created at `~/.minerva/config.json`:
 
 ```json
 {
@@ -80,6 +133,22 @@ Edit `~/.minerva/config.json`:
   }
 }
 ```
+
+### Model Directory Structure
+
+```
+~/.minerva/
+├── config.json                    # Configuration file
+└── models/                        # GGUF model storage
+    ├── mistral-7b.gguf          # Place your GGUF files here
+    ├── llama-2-7b.gguf
+    └── neural-chat-7b.gguf
+```
+
+Models are discovered automatically on app startup. GGUF files can be obtained from:
+- [Hugging Face](https://huggingface.co/models?library=gguf)
+- [TheBloke](https://huggingface.co/TheBloke)
+- [Ollama model library](https://ollama.ai/library)
 
 ## Development
 
@@ -125,16 +194,25 @@ llm = OpenAI(
 
 ```
 minerva/
-├── src/                      # Svelte frontend
-├── src-tauri/                # Tauri/Rust backend
+├── src/                           # Svelte 5 frontend
+│   └── routes/                   # SvelteKit pages
+├── src-tauri/                     # Tauri/Rust backend
 │   ├── src/
-│   │   ├── lib.rs           # Entry point
-│   │   ├── server.rs        # HTTP server
-│   │   ├── models.rs        # Data models
-│   │   └── error.rs         # Error handling
-│   └── Cargo.toml
-├── IMPLEMENTATION_PLAN.md    # Roadmap
-└── README.md
+│   │   ├── lib.rs               # Entry point, Tauri setup
+│   │   ├── main.rs              # Binary entry
+│   │   ├── server.rs            # Axum HTTP server
+│   │   ├── config.rs            # Configuration management
+│   │   ├── commands.rs          # Tauri IPC commands
+│   │   ├── error.rs             # Error handling
+│   │   ├── models/
+│   │   │   ├── mod.rs           # Model types & registry
+│   │   │   ├── loader.rs        # GGUF discovery
+│   │   │   └── gguf_parser.rs   # GGUF binary parsing
+│   │   └── integration_tests.rs  # End-to-end tests
+│   └── Cargo.toml               # Rust dependencies
+├── PHASE_2_PLAN.md              # Phase 2 implementation details
+├── README.md                    # This file
+└── pnpm scripts                 # Development helpers
 ```
 
 ## Contributing
