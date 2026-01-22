@@ -67,8 +67,8 @@ pub struct LlamaCppBackend {
     // Phase 3.5a: Real llama.cpp integration
     // model: Option<llama_cpp::LlamaModel>,
     // context: Option<llama_cpp::LlamaContext>,
-    // n_ctx: usize,
-    // n_threads: usize,
+    n_ctx: usize,
+    n_threads: usize,
 }
 
 impl LlamaCppBackend {
@@ -78,8 +78,8 @@ impl LlamaCppBackend {
         Self {
             // model: None,
             // context: None,
-            // n_ctx: 0,
-            // n_threads: 0,
+            n_ctx: 0,
+            n_threads: num_cpus::get(),
         }
     }
 }
@@ -91,69 +91,145 @@ impl Default for LlamaCppBackend {
 }
 
 impl InferenceBackend for LlamaCppBackend {
-    fn load_model(&mut self, _path: &Path, _n_ctx: usize) -> MinervaResult<()> {
-        // Phase 3.5a implementation:
-        // 1. Create LlamaParams with n_ctx and n_threads
-        // 2. Load: self.model = LlamaModel::load_from_file(path, params)?
-        // 3. Create context: self.context = self.model.create_context()?
-        // 4. Store n_ctx and n_threads
+    fn load_model(&mut self, path: &Path, n_ctx: usize) -> MinervaResult<()> {
+        // Phase 3.5b: Real llama.cpp integration
+        // Note: This is a stub ready for llama.cpp v0.3+ integration
+        // When llama_cpp crate API becomes available:
 
-        Err(MinervaError::InferenceError(
-            "Real llama.cpp backend not yet integrated".to_string(),
-        ))
+        if !path.exists() {
+            return Err(MinervaError::ModelNotFound(format!(
+                "Model file not found: {}",
+                path.display()
+            )));
+        }
+
+        // Phase 3.5b TODO: Replace with actual llama.cpp:
+        // let params = LlamaParams::default()
+        //     .with_context_size(n_ctx as u32)
+        //     .with_n_gpu_layers(40)  // Offload to GPU
+        //     .with_n_threads(self.n_threads as u32);
+        //
+        // self.model = Some(
+        //     LlamaModel::load_from_file(path, params)
+        //         .map_err(|e| MinervaError::ModelLoadingError(format!("{:?}", e)))?
+        // );
+        //
+        // self.context = Some(
+        //     self.model.as_ref().unwrap()
+        //         .create_context()
+        //         .map_err(|e| MinervaError::InferenceError(format!("{:?}", e)))?
+        // );
+        //
+        // self.n_ctx = n_ctx;
+        // tracing::info!(
+        //     "Model loaded successfully: {} (context: {}, GPU layers: 40)",
+        //     path.display(),
+        //     n_ctx
+        // );
+
+        // For now: simulate loading and store context size
+        self.n_ctx = n_ctx;
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        tracing::info!(
+            "Model loading stub: {} (context: {}, ready for real llama.cpp integration)",
+            path.display(),
+            n_ctx
+        );
+
+        Ok(())
     }
 
     fn unload_model(&mut self) {
-        // Phase 3.5a implementation:
-        // self.model = None
-        // self.context = None
+        // Phase 3.5b TODO:
+        // self.model = None;
+        // self.context = None;
+        tracing::info!("Model unload stub");
     }
 
     fn generate(
         &self,
-        _prompt: &str,
-        _max_tokens: usize,
-        _temperature: f32,
-        _top_p: f32,
+        prompt: &str,
+        max_tokens: usize,
+        temperature: f32,
+        top_p: f32,
     ) -> MinervaResult<String> {
-        // Phase 3.5a implementation:
-        // 1. Tokenize: tokens = self.model.tokenize(prompt)?
-        // 2. Evaluate: self.context.eval(&tokens, self.n_threads)?
-        // 3. Sample loop with temperature/top_p
-        // 4. Detokenize and return
+        // Phase 3.5b TODO: Real implementation will:
+        //
+        // 1. Validate context exists
+        // let model = self.model.as_ref()
+        //     .ok_or(MinervaError::InferenceError("Model not loaded".to_string()))?;
+        // let ctx = self.context.as_ref()
+        //     .ok_or(MinervaError::InferenceError("Context not created".to_string()))?;
+        //
+        // 2. Tokenize prompt
+        // let tokens = model.tokenize(prompt)
+        //     .map_err(|e| MinervaError::InferenceError(format!("Tokenization failed: {:?}", e)))?;
+        //
+        // 3. Validate context size
+        // if tokens.len() + max_tokens > self.n_ctx {
+        //     return Err(MinervaError::ContextLimitExceeded {
+        //         max: self.n_ctx,
+        //         required: tokens.len() + max_tokens,
+        //     });
+        // }
+        //
+        // 4. Evaluate tokens
+        // ctx.eval(&tokens, self.n_threads)
+        //     .map_err(|e| MinervaError::InferenceError(format!("Evaluation failed: {:?}", e)))?;
+        //
+        // 5. Sample tokens with parameters
+        // let mut generated = Vec::new();
+        // for _ in 0..max_tokens {
+        //     let token = ctx.sample(temperature, top_p, 40, 1.1);
+        //     if token < 0 { break; }  // EOS token
+        //     generated.push(token);
+        // }
+        //
+        // 6. Detokenize to text
+        // let text = model.detokenize(&generated)
+        //     .map_err(|e| MinervaError::InferenceError(format!("Detokenization failed: {:?}", e)))?;
+        //
+        // Ok(text)
 
-        Err(MinervaError::InferenceError(
-            "Real llama.cpp backend not yet integrated".to_string(),
-        ))
+        // For now: use intelligent mock
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        let response = format!(
+            "Mock response to '{}' (temp={}, top_p={}, max_tokens={}): \
+             This response demonstrates parameter handling. \
+             In Phase 3.5b, real llama.cpp inference will replace this mock.",
+            prompt, temperature, top_p, max_tokens
+        );
+        Ok(response)
     }
 
-    fn tokenize(&self, _text: &str) -> MinervaResult<Vec<i32>> {
-        // Phase 3.5a: self.model.tokenize(text)
-        Err(MinervaError::InferenceError(
-            "Real llama.cpp backend not yet integrated".to_string(),
-        ))
+    fn tokenize(&self, text: &str) -> MinervaResult<Vec<i32>> {
+        // Phase 3.5b TODO: self.model.tokenize(text)
+        // For now: simple word-based mock
+        Ok(text
+            .split_whitespace()
+            .enumerate()
+            .map(|(i, _)| i as i32)
+            .collect())
     }
 
-    fn detokenize(&self, _tokens: &[i32]) -> MinervaResult<String> {
-        // Phase 3.5a: self.model.detokenize(tokens)
-        Err(MinervaError::InferenceError(
-            "Real llama.cpp backend not yet integrated".to_string(),
-        ))
+    fn detokenize(&self, tokens: &[i32]) -> MinervaResult<String> {
+        // Phase 3.5b TODO: self.model.detokenize(tokens)
+        Ok(format!("[{} tokens]", tokens.len()))
     }
 
     fn is_loaded(&self) -> bool {
-        // Phase 3.5a: self.model.is_some()
-        false
+        // Phase 3.5b: self.model.is_some() && self.context.is_some()
+        true // Stub returns true
     }
 
     fn context_size(&self) -> usize {
-        // Phase 3.5a: self.n_ctx
-        0
+        // Phase 3.5b: self.n_ctx
+        self.n_ctx
     }
 
     fn thread_count(&self) -> usize {
-        // Phase 3.5a: self.n_threads
-        0
+        // Phase 3.5b: self.n_threads
+        self.n_threads
     }
 }
 
@@ -355,14 +431,22 @@ mod tests {
     }
 
     #[test]
-    fn test_llama_cpp_backend_not_yet_integrated() {
+    fn test_llama_cpp_backend_stub_loads() {
         let mut backend = LlamaCppBackend::new();
         let temp_dir = TempDir::new().unwrap();
         let model_path = temp_dir.path().join("test.gguf");
         fs::write(&model_path, "dummy").unwrap();
 
-        // Should fail since real llama.cpp not integrated
+        // Stub should succeed (ready for real llama.cpp integration)
         let result = backend.load_model(&model_path, 2048);
+        assert!(result.is_ok());
+        assert_eq!(backend.context_size(), 2048);
+    }
+
+    #[test]
+    fn test_llama_cpp_backend_missing_file() {
+        let mut backend = LlamaCppBackend::new();
+        let result = backend.load_model(std::path::Path::new("/nonexistent/model.gguf"), 2048);
         assert!(result.is_err());
     }
 }
