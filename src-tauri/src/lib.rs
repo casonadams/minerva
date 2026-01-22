@@ -1,6 +1,7 @@
 pub mod commands;
 pub mod config;
 pub mod error;
+pub mod error_recovery;
 pub mod inference;
 pub mod models;
 pub mod server;
