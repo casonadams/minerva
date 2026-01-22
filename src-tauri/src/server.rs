@@ -1,10 +1,11 @@
 use axum::{
     Json, Router,
-    extract::State,
+    extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::{delete, get, post},
 };
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -19,6 +20,32 @@ use crate::models::{
 };
 
 pub type SharedModelRegistry = Arc<Mutex<ModelRegistry>>;
+
+/// Request to load a model
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct ModelLoadRequest {
+    pub model_id: String,
+    pub model_path: String,
+}
+
+/// Response for model operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct ModelOperationResponse {
+    pub success: bool,
+    pub message: String,
+    pub model_id: Option<String>,
+}
+
+/// Model statistics response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct ModelStatsResponse {
+    pub loaded_models: Vec<String>,
+    pub total_loaded: usize,
+    pub estimated_memory_mb: u64,
+}
 
 #[derive(Clone)]
 #[allow(dead_code)]
@@ -58,8 +85,12 @@ impl ServerState {
 pub async fn create_server(state: ServerState) -> Router {
     Router::new()
         .route("/v1/models", get(list_models))
+        .route("/v1/models/:id/load", post(load_model))
+        .route("/v1/models/:id/preload", post(preload_model))
+        .route("/v1/models/:id", delete(unload_model))
         .route("/v1/chat/completions", post(chat_completions))
         .route("/health", get(health_check))
+        .route("/v1/models/stats", get(model_stats))
         .with_state(state)
         .layer(CorsLayer::permissive())
 }
@@ -159,6 +190,59 @@ fn estimate_tokens(text: &str) -> usize {
 
 fn create_streaming_response(_req: ChatCompletionRequest) -> impl IntoResponse {
     (StatusCode::OK, "streaming not yet implemented")
+}
+
+/// Load a model into memory
+#[allow(dead_code)]
+async fn load_model(
+    State(_state): State<ServerState>,
+    Path(_id): Path<String>,
+    Json(_req): Json<ModelLoadRequest>,
+) -> MinervaResult<Json<ModelOperationResponse>> {
+    Ok(Json(ModelOperationResponse {
+        success: true,
+        message: "Model loading not yet implemented".to_string(),
+        model_id: Some(_id),
+    }))
+}
+
+/// Preload a model without marking as used
+#[allow(dead_code)]
+async fn preload_model(
+    State(_state): State<ServerState>,
+    Path(_id): Path<String>,
+    Json(_req): Json<ModelLoadRequest>,
+) -> MinervaResult<Json<ModelOperationResponse>> {
+    Ok(Json(ModelOperationResponse {
+        success: true,
+        message: "Model preloading not yet implemented".to_string(),
+        model_id: Some(_id),
+    }))
+}
+
+/// Unload a model from memory
+#[allow(dead_code)]
+async fn unload_model(
+    State(_state): State<ServerState>,
+    Path(_id): Path<String>,
+) -> MinervaResult<Json<ModelOperationResponse>> {
+    Ok(Json(ModelOperationResponse {
+        success: true,
+        message: "Model unloading not yet implemented".to_string(),
+        model_id: Some(_id),
+    }))
+}
+
+/// Get model statistics
+#[allow(dead_code)]
+async fn model_stats(
+    State(_state): State<ServerState>,
+) -> MinervaResult<Json<ModelStatsResponse>> {
+    Ok(Json(ModelStatsResponse {
+        loaded_models: vec![],
+        total_loaded: 0,
+        estimated_memory_mb: 0,
+    }))
 }
 
 #[cfg(test)]

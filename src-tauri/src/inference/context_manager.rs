@@ -1,4 +1,5 @@
 use super::InferenceEngine;
+use super::model_cache::{CacheStats, EvictionPolicy, ModelCache};
 use crate::error::{MinervaError, MinervaResult};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -48,12 +49,14 @@ impl ModelContext {
     }
 }
 
-/// Manages multiple loaded model contexts
+/// Manages multiple loaded model contexts with caching
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct ContextManager {
     models: HashMap<String, ModelContext>,
     max_models_loaded: usize,
+    cache: ModelCache,
+    memory_estimated_mb: u64,
 }
 
 impl ContextManager {
@@ -62,6 +65,19 @@ impl ContextManager {
         Self {
             models: HashMap::new(),
             max_models_loaded,
+            cache: ModelCache::new(max_models_loaded, EvictionPolicy::Lru),
+            memory_estimated_mb: 0,
+        }
+    }
+
+    /// Create context manager with custom eviction policy
+    #[allow(dead_code)]
+    pub fn with_policy(max_models_loaded: usize, policy: EvictionPolicy) -> Self {
+        Self {
+            models: HashMap::new(),
+            max_models_loaded,
+            cache: ModelCache::new(max_models_loaded, policy),
+            memory_estimated_mb: 0,
         }
     }
 
@@ -192,6 +208,60 @@ impl ContextManager {
     pub fn max_models(&self) -> usize {
         self.max_models_loaded
     }
+
+    /// Get cache statistics
+    #[allow(dead_code)]
+    pub fn cache_stats(&self) -> CacheStats {
+        self.cache.stats()
+    }
+
+    /// Get estimated memory usage in MB
+    #[allow(dead_code)]
+    pub fn estimated_memory_mb(&self) -> u64 {
+        self.memory_estimated_mb
+    }
+
+    /// Update estimated memory (rough approximation)
+    #[allow(dead_code)]
+    pub fn update_memory_estimate(&mut self) {
+        self.memory_estimated_mb = (self.models.len() as u64) * 5000;
+    }
+
+    /// Check if memory pressure is high (>80% capacity)
+    #[allow(dead_code)]
+    pub fn has_memory_pressure(&self) -> bool {
+        (self.models.len() as f32 / self.max_models_loaded as f32) > 0.8
+    }
+
+    /// Get cache hit rate
+    #[allow(dead_code)]
+    pub fn cache_hit_rate(&self) -> f32 {
+        self.cache.stats().hit_rate()
+    }
+
+    /// Preload a model (load without marking as used)
+    #[allow(dead_code)]
+    pub fn preload_model(&mut self, id: &str, path: PathBuf) -> MinervaResult<()> {
+        if self.models.contains_key(id) {
+            return Ok(());
+        }
+
+        if self.models.len() >= self.max_models_loaded {
+            self.unload_least_recently_used();
+        }
+
+        let mut engine = InferenceEngine::new(path);
+        engine.load_model()?;
+
+        let mut context = ModelContext::new(engine);
+        context.last_used = None;
+        self.models.insert(id.to_string(), context);
+
+        self.update_memory_estimate();
+        tracing::info!("Model preloaded: {}", id);
+
+        Ok(())
+    }
 }
 
 impl Default for ContextManager {
@@ -277,5 +347,47 @@ mod tests {
         let manager = ContextManager::default();
         assert_eq!(manager.max_models(), 3);
         assert_eq!(manager.loaded_count(), 0);
+    }
+
+    #[test]
+    fn test_cache_stats_default() {
+        let manager = ContextManager::new(2);
+        let stats = manager.cache_stats();
+        assert_eq!(stats.hits, 0);
+        assert_eq!(stats.misses, 0);
+    }
+
+    #[test]
+    fn test_memory_estimate() {
+        let mut manager = ContextManager::new(2);
+        manager.update_memory_estimate();
+        assert_eq!(manager.estimated_memory_mb(), 0);
+    }
+
+    #[test]
+    fn test_memory_pressure_low() {
+        let manager = ContextManager::new(3);
+        assert!(!manager.has_memory_pressure());
+    }
+
+    #[test]
+    fn test_cache_hit_rate_zero() {
+        let manager = ContextManager::new(2);
+        assert_eq!(manager.cache_hit_rate(), 0.0);
+    }
+
+    #[test]
+    fn test_context_manager_with_policy() {
+        use super::super::model_cache::EvictionPolicy;
+        let manager = ContextManager::with_policy(2, EvictionPolicy::Lfu);
+        assert_eq!(manager.max_models(), 2);
+        assert_eq!(manager.loaded_count(), 0);
+    }
+
+    #[test]
+    fn test_preload_model_nonexistent() {
+        let mut manager = ContextManager::new(2);
+        let result = manager.preload_model("test", PathBuf::from("/nonexistent/model.gguf"));
+        assert!(result.is_err());
     }
 }

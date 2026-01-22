@@ -655,3 +655,139 @@ fn test_context_exceeds_limits() {
     // But it's still technically recoverable (not in the non-recoverable list)
     assert!(ErrorRecovery::is_recoverable(&err));
 }
+
+// Multi-model support tests (Phase 4 Step 1)
+
+#[test]
+fn test_context_manager_cache_stats() {
+    use minerva_lib::inference::context_manager::ContextManager;
+
+    let manager = ContextManager::new(2);
+    let stats = manager.cache_stats();
+
+    assert_eq!(stats.hits, 0);
+    assert_eq!(stats.misses, 0);
+    assert_eq!(stats.evictions, 0);
+    assert_eq!(stats.preloads, 0);
+}
+
+#[test]
+fn test_context_manager_memory_tracking() {
+    use minerva_lib::inference::context_manager::ContextManager;
+
+    let mut manager = ContextManager::new(2);
+    assert_eq!(manager.estimated_memory_mb(), 0);
+
+    manager.update_memory_estimate();
+    assert_eq!(manager.estimated_memory_mb(), 0);
+}
+
+#[test]
+fn test_context_manager_memory_pressure() {
+    use minerva_lib::inference::context_manager::ContextManager;
+
+    let manager = ContextManager::new(3);
+    assert!(!manager.has_memory_pressure());
+
+    let mut full_manager = ContextManager::new(1);
+    full_manager.update_memory_estimate();
+    let memory_after = full_manager.estimated_memory_mb();
+    assert_eq!(memory_after, 0);
+}
+
+#[test]
+fn test_model_cache_creation_lru() {
+    use minerva_lib::inference::model_cache::{EvictionPolicy, ModelCache};
+
+    let cache = ModelCache::new(3, EvictionPolicy::Lru);
+    assert_eq!(cache.size(), 0);
+    assert_eq!(cache.capacity(), 3);
+    assert!(cache.list().is_empty());
+}
+
+#[test]
+fn test_model_cache_creation_lfu() {
+    use minerva_lib::inference::model_cache::{EvictionPolicy, ModelCache};
+
+    let cache = ModelCache::new(2, EvictionPolicy::Lfu);
+    assert_eq!(cache.capacity(), 2);
+}
+
+#[test]
+fn test_model_cache_creation_fifo() {
+    use minerva_lib::inference::model_cache::{EvictionPolicy, ModelCache};
+
+    let cache = ModelCache::new(4, EvictionPolicy::Fifo);
+    assert_eq!(cache.capacity(), 4);
+}
+
+#[test]
+fn test_model_cache_default() {
+    use minerva_lib::inference::model_cache::ModelCache;
+
+    let cache = ModelCache::default();
+    assert_eq!(cache.capacity(), 3);
+    assert_eq!(cache.size(), 0);
+}
+
+#[test]
+fn test_model_cache_contains() {
+    use minerva_lib::inference::model_cache::ModelCache;
+
+    let cache = ModelCache::new(2, minerva_lib::inference::model_cache::EvictionPolicy::Lru);
+    assert!(!cache.contains("test"));
+}
+
+#[test]
+fn test_model_cache_stats_hit_rate() {
+    use minerva_lib::inference::model_cache::CacheStats;
+
+    let mut stats = CacheStats::default();
+    assert_eq!(stats.hit_rate(), 0.0);
+
+    stats.hits = 75;
+    stats.misses = 25;
+    assert_eq!(stats.hit_rate(), 75.0);
+}
+
+#[test]
+fn test_context_manager_with_policy() {
+    use minerva_lib::inference::context_manager::ContextManager;
+    use minerva_lib::inference::model_cache::EvictionPolicy;
+
+    let manager = ContextManager::with_policy(4, EvictionPolicy::Lfu);
+    assert_eq!(manager.max_models(), 4);
+    assert_eq!(manager.loaded_count(), 0);
+}
+
+#[test]
+fn test_model_cache_get_nonexistent() {
+    use minerva_lib::inference::model_cache::{EvictionPolicy, ModelCache};
+
+    let mut cache = ModelCache::new(2, EvictionPolicy::Lru);
+    let result = cache.get_mut("nonexistent");
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_model_cache_list_operations() {
+    use minerva_lib::inference::model_cache::ModelCache;
+
+    let cache = ModelCache::new(3, minerva_lib::inference::model_cache::EvictionPolicy::Lru);
+    let list = cache.list();
+    assert!(list.is_empty());
+    assert_eq!(list.len(), 0);
+}
+
+#[test]
+fn test_preload_strategy_enum() {
+    use minerva_lib::inference::model_cache::PreloadStrategy;
+
+    let eager = PreloadStrategy::Eager;
+    let lazy = PreloadStrategy::Lazy;
+    let scheduled = PreloadStrategy::Scheduled;
+
+    assert!(matches!(eager, PreloadStrategy::Eager));
+    assert!(matches!(lazy, PreloadStrategy::Lazy));
+    assert!(matches!(scheduled, PreloadStrategy::Scheduled));
+}
