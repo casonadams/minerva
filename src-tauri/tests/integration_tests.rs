@@ -330,6 +330,51 @@ fn test_gpu_context_allocation() {
     assert_eq!(ctx.allocated_memory(), initial);
 }
 
+#[test]
+fn test_gpu_initialization_metal() {
+    use minerva_lib::inference::gpu_context::GpuContext;
+
+    let mut ctx = GpuContext::new().unwrap_or_default();
+
+    // Initialize GPU for inference
+    assert!(ctx.initialize_for_inference().is_ok());
+
+    // Verify context is still valid
+    assert!(ctx.available_memory() > 0);
+}
+
+#[test]
+fn test_gpu_device_detection() {
+    use minerva_lib::inference::gpu_context::{GpuContext, GpuDevice};
+
+    let ctx = GpuContext::new().unwrap_or_default();
+    let device = ctx.device();
+
+    // Should be one of the three available devices
+    assert!(matches!(
+        device,
+        GpuDevice::Metal | GpuDevice::Cuda | GpuDevice::Cpu
+    ));
+}
+
+#[test]
+fn test_gpu_memory_limits() {
+    use minerva_lib::inference::gpu_context::{GpuContext, GpuDevice};
+
+    let mut ctx = GpuContext {
+        device: GpuDevice::Cpu,
+        allocated_memory: 500,
+        max_memory: 1000,
+    };
+
+    // Test allocation within limits
+    assert!(ctx.allocate(300).is_ok());
+    assert_eq!(ctx.allocated_memory(), 800);
+
+    // Test allocation exceeding limits
+    assert!(ctx.allocate(300).is_err());
+}
+
 // ============================================================================
 // END-TO-END PIPELINE TESTS
 // ============================================================================

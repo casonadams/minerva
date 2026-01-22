@@ -2205,6 +2205,7 @@ dependencies = [
  "futures",
  "gguf-rs-lib",
  "home",
+ "libc",
  "llama_cpp",
  "num_cpus",
  "parking_lot",

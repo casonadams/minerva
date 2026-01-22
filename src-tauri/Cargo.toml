@@ -42,4 +42,5 @@ llama_cpp = "0.3"
 futures = "0.3"
 parking_lot = "0.12"
 num_cpus = "1.16"
+libc = "0.2"
 
