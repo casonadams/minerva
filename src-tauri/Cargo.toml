@@ -2,8 +2,8 @@
 name = "minerva"
 version = "0.1.0"
 description = "Local LLM server with OpenAI-compatible API"
-authors = ["you"]
-edition = "2021"
+authors = ["Cason Adams <casonadams@gmail.com>"]
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -16,6 +16,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+
+[dev-dependencies]
+tempfile = "3"
 
 [dependencies]
 tauri = { version = "2", features = [] }
@@ -31,4 +34,8 @@ tracing-subscriber = "0.3"
 uuid = { version = "1", features = ["v4", "serde"] }
 thiserror = "1"
 chrono = { version = "0.4", features = ["serde"] }
+gguf-rs-lib = "0.2"
+walkdir = "2"
+home = "0.5"
+anyhow = "1"
 

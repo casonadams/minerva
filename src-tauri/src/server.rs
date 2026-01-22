@@ -1,9 +1,9 @@
 use axum::{
+    Json, Router,
     extract::State,
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{get, post},
-    Json, Router,
 };
 use serde_json::json;
 use std::sync::Arc;
@@ -137,7 +137,8 @@ mod tests {
             max_output_tokens: Some(2048),
         };
 
-        registry.add_model(model.clone());
+        let path = std::path::PathBuf::from("/tmp/test-model.gguf");
+        registry.add_model(model.clone(), path);
         let retrieved = registry.get_model("test-model");
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().id, "test-model");
@@ -155,7 +156,8 @@ mod tests {
             max_output_tokens: None,
         };
 
-        registry.add_model(model);
+        let path = std::path::PathBuf::from("/tmp/test-model.gguf");
+        registry.add_model(model, path);
         assert_eq!(registry.list_models().len(), 1);
 
         registry.remove_model("test-model");
