@@ -1,3 +1,4 @@
+pub mod context_manager;
 pub mod metrics;
 
 use crate::error::{MinervaError, MinervaResult};
@@ -67,6 +68,7 @@ impl GenerationConfig {
 ///
 /// This is a mock implementation for Phase 3 infrastructure.
 /// Phase 3.5 will integrate actual llama.cpp inference.
+#[derive(Debug)]
 #[allow(dead_code)]
 pub struct InferenceEngine {
     model_path: PathBuf,
