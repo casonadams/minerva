@@ -4,6 +4,9 @@ mod error;
 mod models;
 mod server;
 
+#[cfg(test)]
+mod integration_tests;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app_config = config::AppConfig::load_or_default();
