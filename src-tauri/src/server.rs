@@ -235,9 +235,7 @@ async fn unload_model(
 
 /// Get model statistics
 #[allow(dead_code)]
-async fn model_stats(
-    State(_state): State<ServerState>,
-) -> MinervaResult<Json<ModelStatsResponse>> {
+async fn model_stats(State(_state): State<ServerState>) -> MinervaResult<Json<ModelStatsResponse>> {
     Ok(Json(ModelStatsResponse {
         loaded_models: vec![],
         total_loaded: 0,
