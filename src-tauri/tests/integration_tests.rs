@@ -8,6 +8,7 @@
 
 use minerva_lib::inference::llama_adapter::InferenceBackend;
 use std::fs;
+use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
 
 /// Setup helper: create temporary models directory
@@ -445,4 +446,86 @@ fn test_backend_with_streaming() {
     }
 
     assert_eq!(count, response.split_whitespace().count());
+}
+
+#[test]
+fn test_token_stream_callback_streaming() {
+    use minerva_lib::inference::token_stream::TokenStream;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let call_count = Arc::new(AtomicUsize::new(0));
+    let call_count_clone = call_count.clone();
+
+    let callback = Arc::new(move |_token: String| {
+        call_count_clone.fetch_add(1, Ordering::Relaxed);
+    });
+
+    let stream = TokenStream::with_callback(callback);
+
+    // Simulate token generation with callbacks
+    stream.push_token("token1".to_string());
+    stream.push_token("token2".to_string());
+    stream.push_token("token3".to_string());
+
+    // Verify callback was invoked for each token
+    assert_eq!(call_count.load(Ordering::Relaxed), 3);
+    assert_eq!(stream.total_tokens(), 3);
+}
+
+#[test]
+fn test_token_stream_callback_with_content() {
+    use minerva_lib::inference::token_stream::TokenStream;
+
+    let received = Arc::new(Mutex::new(Vec::new()));
+    let received_clone = received.clone();
+
+    let callback = Arc::new(move |token: String| {
+        received_clone.lock().unwrap().push(token);
+    });
+
+    let stream = TokenStream::with_callback(callback);
+
+    stream.push_token("Hello".to_string());
+    stream.push_token(" ".to_string());
+    stream.push_token("World".to_string());
+
+    let tokens = received.lock().unwrap();
+    assert_eq!(*tokens, vec!["Hello", " ", "World"]);
+    assert_eq!(stream.to_string(), "Hello World");
+}
+
+#[test]
+fn test_streaming_with_inference_backend() {
+    use minerva_lib::inference::llama_adapter::{InferenceBackend, MockBackend};
+    use minerva_lib::inference::token_stream::TokenStream;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let (_temp, models_dir) = setup_test_models_dir();
+    let model_path = create_dummy_gguf(&models_dir, "streaming_backend_test");
+
+    let mut backend = MockBackend::new();
+    assert!(backend.load_model(&model_path, 2048).is_ok());
+
+    // Create stream with callback
+    let call_count = Arc::new(AtomicUsize::new(0));
+    let call_count_clone = call_count.clone();
+
+    let callback = Arc::new(move |_token: String| {
+        call_count_clone.fetch_add(1, Ordering::Relaxed);
+    });
+
+    let stream = TokenStream::with_callback(callback);
+
+    // Generate response
+    let response = backend.generate("test prompt", 50, 0.7, 0.9).unwrap();
+
+    // Stream the response with callbacks
+    for word in response.split_whitespace() {
+        stream.push_token(word.to_string());
+    }
+
+    // Verify streaming
+    let token_count = response.split_whitespace().count();
+    assert_eq!(call_count.load(Ordering::Relaxed), token_count);
+    assert_eq!(stream.total_tokens(), token_count);
 }
