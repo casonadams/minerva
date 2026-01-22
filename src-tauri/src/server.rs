@@ -98,7 +98,19 @@ async fn create_completion_response(
     let completion_id = format!("chatcmpl-{}", Uuid::new_v4());
     let created = chrono::Utc::now().timestamp();
 
-    let response_content = "This is a mock response from Minerva. Actual LLM inference will be implemented in Phase 3.".to_string();
+    // Build prompt from messages
+    let prompt = build_chat_prompt(&req.messages);
+
+    // For now, use mock response
+    // In Phase 3.5, this will call the actual inference engine
+    let response_content = format!(
+        "Minerva inference response to: \"{}\" - Mock response for testing",
+        prompt.chars().take(50).collect::<String>()
+    );
+
+    // Estimate token counts (actual tokenization in Phase 3.5)
+    let prompt_tokens = estimate_tokens(&prompt);
+    let completion_tokens = estimate_tokens(&response_content);
 
     Ok(Json(ChatCompletionResponse {
         id: completion_id,
@@ -114,11 +126,27 @@ async fn create_completion_response(
             finish_reason: "stop".to_string(),
         }],
         usage: Usage {
-            prompt_tokens: 10,
-            completion_tokens: 20,
-            total_tokens: 30,
+            prompt_tokens,
+            completion_tokens,
+            total_tokens: prompt_tokens + completion_tokens,
         },
     }))
+}
+
+/// Build a chat prompt from messages
+fn build_chat_prompt(messages: &[ChatMessage]) -> String {
+    messages
+        .iter()
+        .map(|msg| format!("{}: {}", msg.role, msg.content))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Estimate token count (rough approximation)
+/// Real tokenization will use llama.cpp in Phase 3.5
+fn estimate_tokens(text: &str) -> usize {
+    // Rough estimate: ~4 characters per token
+    (text.len() / 4).max(1)
 }
 
 fn create_streaming_response(_req: ChatCompletionRequest) -> impl IntoResponse {

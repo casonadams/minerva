@@ -29,6 +29,15 @@ pub enum MinervaError {
 
     #[error("Model loading error: {0}")]
     ModelLoadingError(String),
+
+    #[error("Context limit exceeded: max {max}, required {required}")]
+    ContextLimitExceeded { max: usize, required: usize },
+
+    #[error("Generation timeout")]
+    GenerationTimeout,
+
+    #[error("Out of memory")]
+    OutOfMemory,
 }
 
 impl IntoResponse for MinervaError {
@@ -43,6 +52,24 @@ impl IntoResponse for MinervaError {
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "model_loading_error",
                 msg,
+            ),
+            MinervaError::ContextLimitExceeded { max, required } => (
+                StatusCode::BAD_REQUEST,
+                "context_limit_exceeded",
+                format!(
+                    "Context limit exceeded: model supports {}, request requires {}",
+                    max, required
+                ),
+            ),
+            MinervaError::GenerationTimeout => (
+                StatusCode::REQUEST_TIMEOUT,
+                "generation_timeout",
+                "Generation request timed out".to_string(),
+            ),
+            MinervaError::OutOfMemory => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "out_of_memory",
+                "Out of memory during inference".to_string(),
             ),
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
