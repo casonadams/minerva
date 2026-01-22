@@ -124,7 +124,7 @@ invoke('ensure_models_directory')
 - [x] GPU memory management and allocation
 - [x] Error handling for resource constraints
 - [x] 10 Phase 3.5 integration tests
-- See `PHASE_3_5_IMPLEMENTATION.md` for architecture
+- See `docs/PHASE_3_5_IMPLEMENTATION.md` for architecture
 
 **Phase 3.5a: Inference Backend Integration** ✅ COMPLETE
 - [x] Intelligent mock inference engine with pattern-based responses
@@ -134,7 +134,18 @@ invoke('ensure_models_directory')
 - [x] 6 new integration tests for backend abstraction
 - [x] 112 total tests (all passing)
 - [x] Clear path to real llama.cpp integration
-- See `PHASE_3_5A_COMPLETION.md` for details
+- See `docs/PHASE_3_5A_COMPLETION.md` for details
+
+**Phase 3.5b: Real llama.cpp Integration** 🔄 IN PROGRESS
+- [x] Step 1: Research llama.cpp crate
+- [x] Step 2: Real backend implementation with GPU acceleration
+- [ ] Step 3: GPU initialization per platform
+- [ ] Step 4: Token streaming with callbacks
+- [ ] Step 5: Error handling & recovery
+- [ ] Step 6: Performance benchmarking
+- [ ] Step 7: Integration testing
+- [ ] Step 8: Documentation
+- See `docs/PHASE_3_5B_PLAN.md` and `docs/PHASE_3_5B_SESSION_SUMMARY.md`
 
 ## Configuration
 
@@ -246,9 +257,17 @@ minerva/
 │       - backend abstraction tests
 │       - parameter validation tests
 │       - end-to-end workflow tests
-├── PHASE_3_IMPLEMENTATION.md        # Phase 3 documentation
-├── PHASE_3_5_IMPLEMENTATION.md      # Phase 3.5 foundation
-├── PHASE_3_5A_COMPLETION.md         # Phase 3.5a completion
+├── docs/                            # Documentation
+│   ├── PHASE_3_IMPLEMENTATION.md    # Phase 3 architecture
+│   ├── PHASE_3_5_IMPLEMENTATION.md  # Phase 3.5 foundation
+│   ├── PHASE_3_5A_COMPLETION.md     # Phase 3.5a completion
+│   ├── PHASE_3_5B_PLAN.md           # Phase 3.5b implementation plan
+│   ├── PHASE_3_5B_SESSION_SUMMARY.md # Phase 3.5b session 2 summary
+│   ├── GPU_ACCELERATION.md          # GPU setup and tuning
+│   ├── TEST_STRUCTURE.md            # Testing organization
+│   ├── DEVELOPMENT.md               # Development guide
+│   ├── SCRIPTS.md                   # Npm script reference
+│   └── IMPLEMENTATION_PLAN.md        # Initial implementation plan
 ├── README.md                        # This file
 └── pnpm scripts                     # Development helpers
 ```
