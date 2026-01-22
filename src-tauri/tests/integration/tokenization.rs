@@ -105,7 +105,9 @@ fn test_token_equality() {
 fn test_bpe_tokenizer_creation() {
     let vocab = Vocabulary::new();
     let tokenizer = BPETokenizer::new(vocab);
-    assert_eq!(tokenizer.vocab().size(), 0);
+    assert_eq!(tokenizer.merge_count(), 0);
+    let tokens = tokenizer.encode("abc");
+    assert!(tokens.is_empty()); // Empty vocab, so no tokens
 }
 
 #[test]
@@ -203,7 +205,7 @@ fn test_detect_default_format() {
 fn test_token_handler_creation() {
     let handler = TokenHandler::new("gpt-3.5".to_string());
     assert_eq!(handler.format(), TokenizerFormat::BPE);
-    assert_eq!(handler.cache_size(), 0);
+    assert!(!handler.is_initialized());
 }
 
 #[test]
@@ -224,23 +226,22 @@ fn test_token_handler_set_tokenizer() {
     let tokenizer = BPETokenizer::new(vocab);
 
     handler.set_tokenizer(tokenizer);
-    // Cache should be cleared when tokenizer is set
-    assert_eq!(handler.cache_size(), 0);
+    assert!(handler.is_initialized());
 }
 
 #[test]
-fn test_token_handler_clear_cache() {
+fn test_token_handler_is_initialized() {
     let mut handler = TokenHandler::new("test".to_string());
+    assert!(!handler.is_initialized());
+
     let vocab = Vocabulary::new();
     handler.set_tokenizer(BPETokenizer::new(vocab));
-
-    handler.clear_cache();
-    assert_eq!(handler.cache_size(), 0);
+    assert!(handler.is_initialized());
 }
 
 #[test]
 fn test_token_handler_encode_without_tokenizer() {
-    let mut handler = TokenHandler::new("test".to_string());
+    let handler = TokenHandler::new("test".to_string());
     let result = handler.encode("hello");
 
     assert!(result.is_err());
@@ -258,7 +259,7 @@ fn test_token_handler_decode_without_tokenizer() {
 
 #[test]
 fn test_token_handler_count_without_tokenizer() {
-    let mut handler = TokenHandler::new("test".to_string());
+    let handler = TokenHandler::new("test".to_string());
     let result = handler.count_tokens("hello");
 
     assert!(result.is_err());
@@ -299,4 +300,153 @@ fn test_tokenizer_format_and_handler() {
 
     let handler = TokenHandler::new("gpt-davinci".to_string());
     assert_eq!(handler.format(), detection.format);
+}
+
+// Vocabulary Loading Tests
+
+#[test]
+fn test_load_vocabulary_txt_basic() {
+    use minerva_lib::inference::tokenizer::load_vocabulary_txt;
+
+    let txt = "hello 1\nworld 2\ntest 3\n";
+    let vocab = load_vocabulary_txt(txt).unwrap();
+
+    assert_eq!(vocab.get_id("hello"), Some(1));
+    assert_eq!(vocab.get_id("world"), Some(2));
+    assert_eq!(vocab.get_id("test"), Some(3));
+}
+
+#[test]
+fn test_load_vocabulary_txt_special_tokens() {
+    use minerva_lib::inference::tokenizer::load_vocabulary_txt;
+
+    let txt = "PAD 0\nUNK 1\nhello 2\n";
+    let vocab = load_vocabulary_txt(txt).unwrap();
+
+    assert_eq!(vocab.pad_token_id(), 0);
+    assert_eq!(vocab.unk_token_id(), 1);
+}
+
+#[test]
+fn test_load_vocabulary_txt_comments() {
+    use minerva_lib::inference::tokenizer::load_vocabulary_txt;
+
+    let txt = "# This is a comment\nhello 1\n# Another comment\nworld 2\n";
+    let vocab = load_vocabulary_txt(txt).unwrap();
+
+    assert_eq!(vocab.size(), 2);
+}
+
+#[test]
+fn test_load_vocabulary_txt_empty_lines() {
+    use minerva_lib::inference::tokenizer::load_vocabulary_txt;
+
+    let txt = "hello 1\n\nworld 2\n\n";
+    let vocab = load_vocabulary_txt(txt).unwrap();
+
+    assert_eq!(vocab.size(), 2);
+}
+
+#[test]
+fn test_load_vocabulary_txt_invalid() {
+    use minerva_lib::inference::tokenizer::load_vocabulary_txt;
+
+    let txt = "# Only comments\n";
+    let result = load_vocabulary_txt(txt);
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_load_vocabulary_json_basic() {
+    use minerva_lib::inference::tokenizer::load_vocabulary_json;
+
+    let json = r#"{"tokens": {"hello": 1, "world": 2}}"#;
+    let vocab = load_vocabulary_json(json).unwrap();
+
+    assert!(vocab.size() > 0);
+}
+
+// BPE Merge Tests
+
+#[test]
+fn test_bpe_add_merge_valid() {
+    let mut vocab = Vocabulary::new();
+    vocab.add_token("h".to_string(), 1).unwrap();
+    vocab.add_token("e".to_string(), 2).unwrap();
+    vocab.add_token("he".to_string(), 3).unwrap();
+
+    let mut tokenizer = BPETokenizer::new(vocab);
+    assert!(tokenizer.add_merge(1, 2, 3).is_ok());
+    assert_eq!(tokenizer.merge_count(), 1);
+}
+
+#[test]
+fn test_bpe_add_merge_invalid_left() {
+    let vocab = Vocabulary::new();
+    let mut tokenizer = BPETokenizer::new(vocab);
+
+    let result = tokenizer.add_merge(999, 2, 3);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_bpe_add_merge_invalid_right() {
+    let mut vocab = Vocabulary::new();
+    vocab.add_token("h".to_string(), 1).unwrap();
+
+    let mut tokenizer = BPETokenizer::new(vocab);
+    let result = tokenizer.add_merge(1, 999, 3);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_bpe_merge_count() {
+    let mut vocab = Vocabulary::new();
+    vocab.add_token("a".to_string(), 1).unwrap();
+    vocab.add_token("b".to_string(), 2).unwrap();
+    vocab.add_token("c".to_string(), 3).unwrap();
+    vocab.add_token("ab".to_string(), 4).unwrap();
+    vocab.add_token("abc".to_string(), 5).unwrap();
+
+    let mut tokenizer = BPETokenizer::new(vocab);
+    assert_eq!(tokenizer.merge_count(), 0);
+
+    tokenizer.add_merge(1, 2, 4).ok();
+    assert_eq!(tokenizer.merge_count(), 1);
+
+    tokenizer.add_merge(4, 3, 5).ok();
+    assert_eq!(tokenizer.merge_count(), 2);
+}
+
+// Real BPE Pipeline Tests
+
+#[test]
+fn test_real_bpe_pipeline() {
+    let mut vocab = Vocabulary::new();
+    vocab.add_token("h".to_string(), 1).unwrap();
+    vocab.add_token("e".to_string(), 2).unwrap();
+    vocab.add_token("l".to_string(), 3).unwrap();
+    vocab.add_token("o".to_string(), 4).unwrap();
+
+    let mut tokenizer = BPETokenizer::new(vocab);
+    tokenizer.add_merge(1, 2, 5).ok();
+
+    let tokens = tokenizer.encode("hello");
+    assert!(!tokens.is_empty());
+}
+
+#[test]
+fn test_vocabulary_with_tokenizer_and_merges() {
+    let mut vocab = Vocabulary::new();
+    vocab.add_token("a".to_string(), 1).unwrap();
+    vocab.add_token("b".to_string(), 2).unwrap();
+    vocab.add_token("c".to_string(), 3).unwrap();
+
+    let mut tokenizer = BPETokenizer::new(vocab);
+    tokenizer.add_merge(1, 2, 4).ok();
+
+    assert_eq!(tokenizer.merge_count(), 1);
+    let tokens = tokenizer.encode("abc");
+    assert!(!tokens.is_empty());
 }

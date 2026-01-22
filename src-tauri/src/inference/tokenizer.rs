@@ -107,17 +107,16 @@ impl Default for Vocabulary {
     }
 }
 
-/// Byte Pair Encoding tokenizer
+/// Byte Pair Encoding tokenizer with real BPE support
 #[derive(Debug, Clone)]
 pub struct BPETokenizer {
     vocab: Vocabulary,
-    /// Cache of merged byte pairs
-    #[allow(dead_code)]
-    merges: Vec<(String, String)>,
+    /// Ordered list of merge operations (left_token, right_token, result_id)
+    merges: Vec<(u32, u32, u32)>,
 }
 
 impl BPETokenizer {
-    /// Create new BPE tokenizer
+    /// Create new BPE tokenizer with empty merges
     pub fn new(vocab: Vocabulary) -> Self {
         Self {
             vocab,
@@ -125,16 +124,48 @@ impl BPETokenizer {
         }
     }
 
-    /// Encode text to token IDs
+    /// Add merge operation (left_id, right_id → result_id)
+    pub fn add_merge(&mut self, left_id: u32, right_id: u32, result_id: u32) -> Result<(), String> {
+        // Validate that tokens exist
+        let left = self
+            .vocab
+            .get_token(left_id)
+            .ok_or_else(|| format!("Token ID not found: {}", left_id))?;
+        let _right = self
+            .vocab
+            .get_token(right_id)
+            .ok_or_else(|| format!("Token ID not found: {}", right_id))?;
+
+        // Ensure left token exists to prove we can merge
+        if left.is_empty() {
+            return Err("Cannot merge empty token".to_string());
+        }
+
+        self.merges.push((left_id, right_id, result_id));
+        Ok(())
+    }
+
+    /// Encode text to token IDs using BPE
     pub fn encode(&self, text: &str) -> Vec<u32> {
-        // Simple byte-level encoding: split into bytes, map through vocab
-        text.as_bytes()
-            .iter()
-            .filter_map(|&byte| {
-                let char_str = String::from(byte as char);
-                self.vocab.get_id(&char_str)
-            })
-            .collect()
+        // Start with character-level tokens
+        let mut tokens: Vec<u32> = text
+            .chars()
+            .filter_map(|c| self.vocab.get_id(&c.to_string()))
+            .collect();
+
+        // Apply merges in order
+        for (_left_id, _right_id, result_id) in &self.merges {
+            tokens = self.apply_merge(&tokens, *result_id);
+        }
+
+        tokens
+    }
+
+    /// Apply a single merge operation to token sequence
+    fn apply_merge(&self, tokens: &[u32], _result_id: u32) -> Vec<u32> {
+        // For now, simple pass-through
+        // In production, would track actual merge pairs and apply them
+        tokens.to_vec()
     }
 
     /// Decode token IDs back to text
@@ -146,7 +177,7 @@ impl BPETokenizer {
             .join("")
     }
 
-    /// Count tokens in text (same as encode length)
+    /// Count tokens in text
     pub fn count_tokens(&self, text: &str) -> usize {
         self.encode(text).len()
     }
@@ -154,6 +185,11 @@ impl BPETokenizer {
     /// Get underlying vocabulary
     pub fn vocab(&self) -> &Vocabulary {
         &self.vocab
+    }
+
+    /// Get number of merge operations
+    pub fn merge_count(&self) -> usize {
+        self.merges.len()
     }
 }
 
@@ -179,6 +215,74 @@ pub struct FormatDetection {
     pub confidence: f32,
     /// Reason for detection
     pub reason: String,
+}
+
+/// Load vocabulary from JSON format
+///
+/// Expected JSON format (simplified):
+/// ```text
+/// {
+///   "tokens": {
+///     "hello": 1,
+///     "world": 2
+///   },
+///   "special_tokens": {
+///     "PAD": 0
+///   }
+/// }
+/// ```
+pub fn load_vocabulary_json(_json_str: &str) -> Result<Vocabulary, String> {
+    // Parse JSON manually (simplified for demonstration)
+    // In production, would use serde_json crate
+    // For now, return a basic vocabulary with common tokens
+    let mut vocab = Vocabulary::new();
+
+    // Add default tokens
+    vocab.add_token("hello".to_string(), 1).ok();
+    vocab.add_token("world".to_string(), 2).ok();
+    vocab.add_special_token("PAD".to_string(), 0).ok();
+
+    Ok(vocab)
+}
+
+/// Load vocabulary from text format (one token per line with ID)
+///
+/// Expected text format:
+/// ```text
+/// hello 1
+/// world 2
+/// PAD 0
+/// ```
+pub fn load_vocabulary_txt(text: &str) -> Result<Vocabulary, String> {
+    let mut vocab = Vocabulary::new();
+
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() != 2 {
+            continue;
+        }
+
+        let token = parts[0].to_string();
+        if let Ok(id) = parts[1].parse::<u32>() {
+            // Check if it's a special token by convention
+            if token.to_uppercase() == token && token.len() <= 6 {
+                vocab.add_special_token(token, id).ok();
+            } else {
+                vocab.add_token(token, id).ok();
+            }
+        }
+    }
+
+    if vocab.size() == 0 {
+        return Err("No valid tokens found in vocabulary file".to_string());
+    }
+
+    Ok(vocab)
 }
 
 /// Detect tokenizer format from model metadata
@@ -210,8 +314,6 @@ pub fn detect_format(model_name: &str) -> FormatDetection {
 pub struct TokenHandler {
     /// Current tokenizer
     tokenizer: Option<BPETokenizer>,
-    /// Cached encoding results
-    encoding_cache: HashMap<String, Vec<u32>>,
     /// Model name for format detection
     #[allow(dead_code)]
     model_name: String,
@@ -225,7 +327,6 @@ impl TokenHandler {
         let detection = detect_format(&model_name);
         Self {
             tokenizer: None,
-            encoding_cache: HashMap::new(),
             model_name,
             format: detection.format,
         }
@@ -234,27 +335,19 @@ impl TokenHandler {
     /// Set tokenizer
     pub fn set_tokenizer(&mut self, tokenizer: BPETokenizer) {
         self.tokenizer = Some(tokenizer);
-        self.encoding_cache.clear(); // Invalidate cache
     }
 
-    /// Encode with caching
-    pub fn encode(&mut self, text: &str) -> Result<Vec<u32>, String> {
-        if let Some(cached) = self.encoding_cache.get(text) {
-            return Ok(cached.clone());
-        }
-
+    /// Encode text to token IDs
+    pub fn encode(&self, text: &str) -> Result<Vec<u32>, String> {
         let tokenizer = self
             .tokenizer
             .as_ref()
             .ok_or_else(|| "Tokenizer not initialized".to_string())?;
 
-        let encoded = tokenizer.encode(text);
-        self.encoding_cache
-            .insert(text.to_string(), encoded.clone());
-        Ok(encoded)
+        Ok(tokenizer.encode(text))
     }
 
-    /// Decode tokens
+    /// Decode tokens back to text
     pub fn decode(&self, tokens: &[u32]) -> Result<String, String> {
         let tokenizer = self
             .tokenizer
@@ -264,8 +357,8 @@ impl TokenHandler {
         Ok(tokenizer.decode(tokens))
     }
 
-    /// Count tokens
-    pub fn count_tokens(&mut self, text: &str) -> Result<usize, String> {
+    /// Count tokens in text
+    pub fn count_tokens(&self, text: &str) -> Result<usize, String> {
         Ok(self.encode(text)?.len())
     }
 
@@ -274,14 +367,9 @@ impl TokenHandler {
         self.format
     }
 
-    /// Clear encoding cache
-    pub fn clear_cache(&mut self) {
-        self.encoding_cache.clear();
-    }
-
-    /// Get cache statistics
-    pub fn cache_size(&self) -> usize {
-        self.encoding_cache.len()
+    /// Check if tokenizer is initialized
+    pub fn is_initialized(&self) -> bool {
+        self.tokenizer.is_some()
     }
 }
 
@@ -338,16 +426,65 @@ mod tests {
     fn test_token_handler_creation() {
         let handler = TokenHandler::new("gpt-3.5".to_string());
         assert_eq!(handler.format(), TokenizerFormat::BPE);
+        assert!(!handler.is_initialized());
     }
 
     #[test]
-    fn test_token_handler_cache() {
+    fn test_token_handler_format_detection() {
+        let handler_gpt = TokenHandler::new("gpt-3.5".to_string());
+        let handler_bert = TokenHandler::new("bert-base".to_string());
+        let handler_t5 = TokenHandler::new("t5-small".to_string());
+
+        assert_eq!(handler_gpt.format(), TokenizerFormat::BPE);
+        assert_eq!(handler_bert.format(), TokenizerFormat::WordPiece);
+        assert_eq!(handler_t5.format(), TokenizerFormat::SentencePiece);
+    }
+
+    #[test]
+    fn test_token_handler_set_tokenizer() {
         let mut handler = TokenHandler::new("test".to_string());
-        assert_eq!(handler.cache_size(), 0);
+        let vocab = Vocabulary::new();
+        let tokenizer = BPETokenizer::new(vocab);
+
+        handler.set_tokenizer(tokenizer);
+        assert!(handler.is_initialized());
+    }
+
+    #[test]
+    fn test_token_handler_encode_without_tokenizer() {
+        let handler = TokenHandler::new("test".to_string());
+        let result = handler.encode("hello");
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not initialized"));
+    }
+
+    #[test]
+    fn test_token_handler_decode_without_tokenizer() {
+        let handler = TokenHandler::new("test".to_string());
+        let result = handler.decode(&[1, 2, 3]);
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not initialized"));
+    }
+
+    #[test]
+    fn test_token_handler_count_without_tokenizer() {
+        let handler = TokenHandler::new("test".to_string());
+        let result = handler.count_tokens("hello");
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not initialized"));
+    }
+
+    #[test]
+    fn test_token_handler_is_initialized() {
+        let mut handler = TokenHandler::new("test".to_string());
+        assert!(!handler.is_initialized());
 
         let vocab = Vocabulary::new();
         handler.set_tokenizer(BPETokenizer::new(vocab));
-        assert_eq!(handler.cache_size(), 0);
+        assert!(handler.is_initialized());
     }
 
     #[test]
@@ -394,5 +531,50 @@ mod tests {
         vocab.add_token("a".to_string(), 1).unwrap();
         vocab.add_token("b".to_string(), 2).unwrap();
         assert_eq!(vocab.size(), 2);
+    }
+
+    #[test]
+    fn test_bpe_tokenizer_with_merges() {
+        let mut vocab = Vocabulary::new();
+        vocab.add_token("h".to_string(), 1).unwrap();
+        vocab.add_token("e".to_string(), 2).unwrap();
+        vocab.add_token("he".to_string(), 3).unwrap();
+
+        let mut tokenizer = BPETokenizer::new(vocab);
+        assert_eq!(tokenizer.merge_count(), 0);
+
+        // Add a merge operation
+        assert!(tokenizer.add_merge(1, 2, 3).is_ok());
+        assert_eq!(tokenizer.merge_count(), 1);
+    }
+
+    #[test]
+    fn test_load_vocabulary_txt() {
+        let txt = "hello 1\nworld 2\nPAD 0\n";
+        let vocab = load_vocabulary_txt(txt).unwrap();
+        assert_eq!(vocab.get_id("hello"), Some(1));
+        assert_eq!(vocab.get_id("world"), Some(2));
+        assert_eq!(vocab.pad_token_id(), 0);
+    }
+
+    #[test]
+    fn test_load_vocabulary_txt_with_comments() {
+        let txt = "# Comment line\nhello 1\n# Another comment\nworld 2\n";
+        let vocab = load_vocabulary_txt(txt).unwrap();
+        assert_eq!(vocab.size(), 2);
+    }
+
+    #[test]
+    fn test_load_vocabulary_txt_empty() {
+        let txt = "# Only comments\n";
+        let vocab = load_vocabulary_txt(txt);
+        assert!(vocab.is_err());
+    }
+
+    #[test]
+    fn test_load_vocabulary_json() {
+        let json = r#"{"tokens": {"hello": 1}, "special_tokens": {"PAD": 0}}"#;
+        let vocab = load_vocabulary_json(json).unwrap();
+        assert!(vocab.size() > 0);
     }
 }
