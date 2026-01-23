@@ -18,6 +18,7 @@ pub mod parameters;
 pub mod pattern_detector;
 pub mod preload_manager;
 pub mod streaming;
+pub mod streaming_response;
 pub mod token_stream;
 pub mod tokenizer;
 
