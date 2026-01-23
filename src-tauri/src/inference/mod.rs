@@ -16,6 +16,7 @@ pub mod model_cache;
 pub mod model_registry;
 pub mod parameters;
 pub mod pattern_detector;
+pub mod phase5_integration;
 pub mod preload_manager;
 pub mod streaming;
 pub mod streaming_response;
