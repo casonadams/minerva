@@ -3,6 +3,7 @@ pub mod config;
 pub mod error;
 pub mod error_recovery;
 pub mod inference;
+pub mod logging;
 pub mod models;
 pub mod server;
 
