@@ -20,7 +20,8 @@
     "lint": "pnpm lint:backend && pnpm lint:frontend",
     "lint:backend": "cd src-tauri && cargo clippy --all-targets --all-features -- -D warnings && cd ..",
     "lint:backend:fix": "cd src-tauri && cargo clippy --all-targets --all-features --fix && cd ..",
-    "lint:frontend": "pnpm check:frontend",
+    "lint:frontend": "eslint src --ext .js,.ts && pnpm check:frontend",
+    "lint:frontend:fix": "eslint src --ext .js,.ts --fix && pnpm fmt:frontend",
     "fmt": "pnpm fmt:backend && pnpm fmt:frontend",
     "fmt:backend": "cd src-tauri && cargo fmt && cd ..",
     "fmt:backend:check": "cd src-tauri && cargo fmt -- --check && cd ..",
@@ -39,15 +40,18 @@
     "@tauri-apps/plugin-opener": "^2"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@sveltejs/adapter-static": "^3.0.6",
     "@sveltejs/kit": "^2.9.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "@tauri-apps/cli": "^2",
+    "eslint": "^9.0.0",
+    "eslint-plugin-svelte": "^2.0.0",
+    "prettier": "^3.0.0",
+    "prettier-plugin-svelte": "^3.0.0",
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",
     "typescript": "~5.6.2",
-    "vite": "^6.0.3",
-    "@tauri-apps/cli": "^2",
-    "prettier": "^3.0.0",
-    "prettier-plugin-svelte": "^3.0.0"
+    "vite": "^6.0.3"
   }
 }

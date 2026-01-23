@@ -1,77 +1,123 @@
 # Clippy Violations Report
 
+## Status: RESOLVED
+
+All 6 clippy violations have been fixed by refactoring functions to use parameter objects.
+**Last Updated**: Session following clippy violation detection
+
 ## Overview
 Clippy configuration enforces `too-many-arguments-threshold = 3` as per engineering standards. Functions should have at most 3 parameters; complex parameter lists should be consolidated into objects/structs.
 
-## Current Violations (6 total)
+## Violations (FIXED - 6 total)
 
-### 1. parameters.rs:90 - `make_request()` (4 args)
+### 1. parameters.rs:90 - `make_request()` (4 args) - FIXED
 **File**: `src/inference/parameters.rs:90`
 **Function**: `make_request()`
-**Arguments**: 4 (violates threshold of 3)
+**Original Arguments**: 4 (violates threshold of 3)
 
+**Fix Applied**: Created `TestRequestParams` struct
 ```rust
-fn make_request(
-    temp: Option<f32>,
-    top_p: Option<f32>,
-    max_tokens: Option<usize>,
-    freq_penalty: Option<f32>,
-) -> ChatCompletionRequest { ... }
-```
-
-**Fix**: Create a struct to hold generation parameters
-```rust
-struct GenerationParams {
+#[derive(Default)]
+struct TestRequestParams {
     temperature: Option<f32>,
     top_p: Option<f32>,
     max_tokens: Option<usize>,
     frequency_penalty: Option<f32>,
 }
 
-fn make_request(params: GenerationParams) -> ChatCompletionRequest { ... }
+fn make_request(params: TestRequestParams) -> ChatCompletionRequest { ... }
 ```
+
+**Commit**: b205500
 
 ---
 
-### 2. benchmarks.rs:28 - (needs inspection)
+### 2. benchmarks.rs:28 - `PerformanceMetrics::new()` (4 args) - FIXED
 **File**: `src/inference/benchmarks.rs:28`
-**Arguments**: 5 (violates threshold)
+**Original Arguments**: 4 (violates threshold)
 
----
-
-### 3. llama_adapter.rs:39 - (needs inspection)
-**File**: `src/inference/llama_adapter.rs:39`
-**Arguments**: 5 (violates threshold)
-
----
-
-### 4. metrics.rs:18 - (needs inspection)
-**File**: `src/inference/metrics.rs:18`
-**Arguments**: 5 (violates threshold)
-
----
-
-### 5. tokenizer.rs:128 - (needs inspection)
-**File**: `src/inference/tokenizer.rs:128`
-**Arguments**: 4 (violates threshold)
-
----
-
-### 6. gguf_tensor.rs:137 - `new()` (4 args)
-**File**: `src/models/gguf_tensor.rs:137`
-**Function**: `GGUFTensor::new()`
-**Arguments**: 4 (violates threshold)
-
+**Fix Applied**: Created `PerformanceMetricsInput` struct
 ```rust
-pub fn new(
-    name: String,
-    data_type: GGUFDataType,
-    shape: Vec<u64>,
-    data: Vec<u8>,
-) -> Self { ... }
+pub struct PerformanceMetricsInput {
+    pub duration: Duration,
+    pub token_count: usize,
+    pub memory_bytes: usize,
+    pub gpu_used: bool,
+}
+
+pub fn new(input: PerformanceMetricsInput) -> Self { ... }
 ```
 
-**Fix**: Use a builder pattern or struct initialization
+**Commit**: b205500
+
+---
+
+### 3. metrics.rs:18 - `InferenceMetrics::new()` (5 args) - FIXED
+**File**: `src/inference/metrics.rs:18`
+**Original Arguments**: 5 (violates threshold)
+
+**Fix Applied**: Created `InferenceMetricsInput` struct
+```rust
+pub struct InferenceMetricsInput {
+    pub request_id: String,
+    pub model_name: String,
+    pub prompt_tokens: usize,
+    pub completion_tokens: usize,
+    pub model_load_time_ms: u128,
+}
+
+pub fn new(input: InferenceMetricsInput) -> Self { ... }
+```
+
+**Commit**: b205500
+
+---
+
+### 4. tokenizer.rs:128 - `BPETokenizer::add_merge()` (4 args) - FIXED
+**File**: `src/inference/tokenizer.rs:128`
+**Original Arguments**: 4 (3 params + self)
+
+**Fix Applied**: Created `MergeOperation` struct
+```rust
+#[derive(Debug, Clone, Copy)]
+pub struct MergeOperation {
+    pub left_id: u32,
+    pub right_id: u32,
+    pub result_id: u32,
+}
+
+pub fn add_merge(&mut self, merge: MergeOperation) -> Result<(), String> { ... }
+```
+
+**Commit**: b205500
+
+---
+
+### 5. llama_adapter.rs:39 - `InferenceBackend::generate()` (5 args) - FIXED
+**File**: `src/inference/llama_adapter.rs:39`
+**Original Arguments**: 5 (4 params + self)
+
+**Fix Applied**: Created `GenerationParams` struct
+```rust
+#[derive(Debug, Clone, Copy)]
+pub struct GenerationParams {
+    pub max_tokens: usize,
+    pub temperature: f32,
+    pub top_p: f32,
+}
+
+fn generate(&self, prompt: &str, params: GenerationParams) -> MinervaResult<String>;
+```
+
+**Commit**: b205500
+
+---
+
+### 6. gguf_tensor.rs:137 - `GGUFTensor::new()` (4 args) - FIXED
+**File**: `src/models/gguf_tensor.rs:137`
+**Original Arguments**: 4
+
+**Fix Applied**: Created `GGUFTensorData` struct with `From<>` implementation
 ```rust
 pub struct GGUFTensorData {
     pub name: String,
@@ -81,7 +127,13 @@ pub struct GGUFTensorData {
 }
 
 impl From<GGUFTensorData> for GGUFTensor { ... }
+
+pub fn new(input: GGUFTensorData) -> Self {
+    Self::from(input)
+}
 ```
+
+**Commit**: b205500
 
 ---
 
@@ -105,20 +157,29 @@ Functions with too many arguments indicate:
 3. Run `cargo clippy --all-targets -- -D clippy::too-many-arguments` to verify
 4. All tests should pass after refactoring
 
-## Files to Modify
+## Files Modified
 
-- [ ] `src/inference/parameters.rs` - make_request()
-- [ ] `src/inference/benchmarks.rs` - line 28
-- [ ] `src/inference/llama_adapter.rs` - line 39
-- [ ] `src/inference/metrics.rs` - line 18
-- [ ] `src/inference/tokenizer.rs` - line 128
-- [ ] `src/models/gguf_tensor.rs` - GGUFTensor::new()
+- [x] `src/inference/parameters.rs` - make_request() refactored to TestRequestParams
+- [x] `src/inference/benchmarks.rs` - PerformanceMetrics::new() refactored to PerformanceMetricsInput
+- [x] `src/inference/llama_adapter.rs` - generate() refactored to GenerationParams
+- [x] `src/inference/metrics.rs` - InferenceMetrics::new() refactored to InferenceMetricsInput
+- [x] `src/inference/tokenizer.rs` - add_merge() refactored to MergeOperation
+- [x] `src/models/gguf_tensor.rs` - GGUFTensor::new() refactored to GGUFTensorData + From<>
+
+## Integration Test Files Modified
+
+- [x] `tests/integration/tokenization.rs` - Updated MergeOperation struct usage
+- [x] `tests/integration/streaming.rs` - Updated GenerationParams struct usage
+- [x] `tests/integration/error_recovery_e2e.rs` - Updated GenerationParams and PerformanceMetricsInput
+- [x] `tests/integration_tests.rs` - Updated all struct usages
 
 ## Success Criteria
 
-- ✅ All 6 violations fixed
-- ✅ No new violations introduced
-- ✅ All 330+ tests passing
-- ✅ `cargo clippy --all-targets -- -D clippy::too-many-arguments` passes
-- ✅ Code quality maintained or improved
+- [x] All 6 violations fixed
+- [x] No new violations introduced
+- [x] All 330 lib tests passing
+- [x] All 248 integration tests passing
+- [x] `cargo clippy --all-targets` produces zero warnings (no too-many-arguments violations)
+- [x] Code quality maintained and improved via parameter structs
+- [x] All changes committed in single clean commit
 
