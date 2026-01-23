@@ -5,6 +5,7 @@ pub mod error_recovery;
 pub mod inference;
 pub mod logging;
 pub mod models;
+pub mod observability;
 pub mod resilience;
 pub mod server;
 
