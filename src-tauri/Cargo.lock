@@ -2396,6 +2396,7 @@ dependencies = [
  "llama_cpp",
  "num_cpus",
  "parking_lot",
+ "rand 0.8.5",
  "rayon",
  "serde",
  "serde_json",
