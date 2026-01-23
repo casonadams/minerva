@@ -270,16 +270,36 @@ pub struct MultiHeadAttention {
     rope: RoPEParams,
 }
 
+/// Parameters for MultiHeadAttention::apply_rope
+struct RopeParams<'a> {
+    query: &'a mut [f32],
+    key: &'a mut [f32],
+    pos: usize,
+}
+
+/// Parameters for MultiHeadAttention::compute_scores
+struct ScoreParams<'a> {
+    query: &'a [f32],
+    keys: &'a [f32],
+    scale: f32,
+}
+
 impl MultiHeadAttention {
-    /// Create new attention module
-    pub fn new(num_heads: usize, hidden_dim: usize) -> MinervaResult<Self> {
-        if !hidden_dim.is_multiple_of(num_heads) {
+    /// Create new multihead attention
+    pub fn new(num_heads: usize, total_dim: usize) -> MinervaResult<Self> {
+        if !total_dim.is_multiple_of(num_heads) {
             return Err(MinervaError::InferenceError(
-                "Hidden dimension must be divisible by num_heads".to_string(),
+                "Total dimension must be divisible by num_heads".to_string(),
             ));
         }
 
-        let head_dim = hidden_dim / num_heads;
+        let head_dim = total_dim / num_heads;
+        if !(num_heads * head_dim).is_multiple_of(2) {
+            return Err(MinervaError::InferenceError(
+                "num_heads * head_dim must be even for RoPE".to_string(),
+            ));
+        }
+
         Ok(Self {
             num_heads,
             head_dim,
@@ -288,50 +308,50 @@ impl MultiHeadAttention {
     }
 
     /// Apply rotary embeddings to query and key
-    fn apply_rope(&self, query: &mut [f32], key: &mut [f32], pos: usize) {
+    fn apply_rope(&self, rope: RopeParams) {
         for h in 0..self.num_heads {
             for d in (0..self.head_dim).step_by(2) {
-                let angle = self.rope.get_angle(pos, d);
+                let angle = self.rope.get_angle(rope.pos, d);
                 let cos = angle.cos();
                 let sin = angle.sin();
 
                 // Apply rotation to query
                 let q_idx_base = h * self.head_dim + d;
-                if q_idx_base + 1 < query.len() {
-                    let q0 = query[q_idx_base];
-                    let q1 = query[q_idx_base + 1];
-                    query[q_idx_base] = q0 * cos - q1 * sin;
-                    query[q_idx_base + 1] = q0 * sin + q1 * cos;
+                if q_idx_base + 1 < rope.query.len() {
+                    let q0 = rope.query[q_idx_base];
+                    let q1 = rope.query[q_idx_base + 1];
+                    rope.query[q_idx_base] = q0 * cos - q1 * sin;
+                    rope.query[q_idx_base + 1] = q0 * sin + q1 * cos;
                 }
 
                 // Apply rotation to key
                 let k_idx_base = h * self.head_dim + d;
-                if k_idx_base + 1 < key.len() {
-                    let k0 = key[k_idx_base];
-                    let k1 = key[k_idx_base + 1];
-                    key[k_idx_base] = k0 * cos - k1 * sin;
-                    key[k_idx_base + 1] = k0 * sin + k1 * cos;
+                if k_idx_base + 1 < rope.key.len() {
+                    let k0 = rope.key[k_idx_base];
+                    let k1 = rope.key[k_idx_base + 1];
+                    rope.key[k_idx_base] = k0 * cos - k1 * sin;
+                    rope.key[k_idx_base + 1] = k0 * sin + k1 * cos;
                 }
             }
         }
     }
 
     /// Compute attention scores between query and keys
-    fn compute_scores(&self, query: &[f32], keys: &[f32], scale: f32) -> Vec<f32> {
-        let num_keys = keys.len() / (self.num_heads * self.head_dim);
+    fn compute_scores(&self, params: ScoreParams) -> Vec<f32> {
+        let num_keys = params.keys.len() / (self.num_heads * self.head_dim);
         let mut scores = vec![0.0; num_keys];
 
         for h in 0..self.num_heads {
-            for (k_pos, score) in scores.iter_mut().enumerate() {
+            for (k_pos, s) in scores.iter_mut().enumerate() {
                 let mut dot_product = 0.0;
                 for d in 0..self.head_dim {
                     let q_idx = h * self.head_dim + d;
                     let k_idx = k_pos * (self.num_heads * self.head_dim) + h * self.head_dim + d;
-                    if q_idx < query.len() && k_idx < keys.len() {
-                        dot_product += query[q_idx] * keys[k_idx];
+                    if q_idx < params.query.len() && k_idx < params.keys.len() {
+                        dot_product += params.query[q_idx] * params.keys[k_idx];
                     }
                 }
-                *score += dot_product * scale;
+                *s += dot_product * params.scale;
             }
         }
 
@@ -347,11 +367,19 @@ impl MultiHeadAttention {
         }
 
         // Apply rotary embeddings
-        self.apply_rope(params.query, params.key, params.pos);
+        self.apply_rope(RopeParams {
+            query: params.query,
+            key: params.key,
+            pos: params.pos,
+        });
 
         // Compute attention scores
         let scale = (self.head_dim as f32).sqrt().recip();
-        let mut scores = self.compute_scores(params.query, params.key, scale);
+        let mut scores = self.compute_scores(ScoreParams {
+            query: params.query,
+            keys: params.key,
+            scale,
+        });
 
         // Apply softmax
         softmax(&mut scores);
@@ -426,9 +454,9 @@ impl FeedForward {
 
         // Up projection: x @ up_weight
         let mut hidden = vec![0.0; self.intermediate_size];
-        for i in 0..self.intermediate_size {
-            for j in 0..self.hidden_size {
-                hidden[i] += params.x[j] * params.up_weight[i * self.hidden_size + j];
+        for (i, h) in hidden.iter_mut().enumerate() {
+            for (j, &x) in params.x.iter().enumerate() {
+                *h += x * params.up_weight[i * self.hidden_size + j];
             }
         }
 
@@ -438,9 +466,9 @@ impl FeedForward {
         // Down projection: hidden @ down_weight
         let mut output = vec![0.0; self.hidden_size];
         if params.down_weight.len() == self.intermediate_size * self.hidden_size {
-            for i in 0..self.hidden_size {
-                for j in 0..self.intermediate_size {
-                    output[i] += hidden[j] * params.down_weight[j * self.hidden_size + i];
+            for (i, o) in output.iter_mut().enumerate() {
+                for (j, &h) in hidden.iter().enumerate() {
+                    *o += h * params.down_weight[j * self.hidden_size + i];
                 }
             }
         }
@@ -460,6 +488,34 @@ pub enum SamplingStrategy {
     TopP(f32),
 }
 
+/// Parameters for token sampling
+pub struct SamplingParams {
+    /// Temperature for controlling randomness
+    pub temperature: f32,
+    /// Sampling strategy
+    pub strategy: SamplingStrategy,
+}
+
+impl SamplingParams {
+    /// Create new sampling params with greedy strategy
+    pub fn greedy(temperature: f32) -> Self {
+        Self {
+            temperature,
+            strategy: SamplingStrategy::Greedy,
+        }
+    }
+}
+
+/// Parameters for TokenGenerator::generate
+pub struct GenerationParams<'a> {
+    /// Initial tokens to start generation
+    pub initial_tokens: &'a [usize],
+    /// Number of tokens to generate
+    pub num_tokens: usize,
+    /// Sampling parameters
+    pub sampling: SamplingParams,
+}
+
 /// Decoder for token generation
 pub struct Decoder {
     vocab_size: usize,
@@ -476,12 +532,7 @@ impl Decoder {
     }
 
     /// Sample next token from logits
-    pub fn sample_token(
-        &self,
-        logits: &[f32],
-        temperature: f32,
-        strategy: SamplingStrategy,
-    ) -> MinervaResult<usize> {
+    pub fn sample_token(&self, logits: &[f32], params: SamplingParams) -> MinervaResult<usize> {
         if logits.len() != self.vocab_size {
             return Err(MinervaError::InferenceError(format!(
                 "Logits size {} != vocab size {}",
@@ -490,14 +541,17 @@ impl Decoder {
             )));
         }
 
-        if temperature <= 0.0 {
+        if params.temperature <= 0.0 {
             return Err(MinervaError::InferenceError(
                 "Temperature must be positive".to_string(),
             ));
         }
 
         // Apply temperature scaling
-        let probs = logits.iter().map(|l| l / temperature).collect::<Vec<_>>();
+        let probs = logits
+            .iter()
+            .map(|l| l / params.temperature)
+            .collect::<Vec<_>>();
 
         // Apply softmax
         let max = probs.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
@@ -508,7 +562,7 @@ impl Decoder {
         }
 
         // Apply sampling strategy
-        let token = match strategy {
+        let token = match params.strategy {
             SamplingStrategy::Greedy => probs
                 .iter()
                 .enumerate()
@@ -608,30 +662,31 @@ impl Decoder {
     /// Generate tokens
     pub fn generate(
         &self,
-        initial_tokens: &[usize],
-        num_tokens: usize,
-        temperature: f32,
-        strategy: SamplingStrategy,
+        params: GenerationParams,
         mut forward: impl FnMut(&[usize]) -> MinervaResult<Vec<f32>>,
     ) -> MinervaResult<Vec<usize>> {
-        if initial_tokens.is_empty() {
+        if params.initial_tokens.is_empty() {
             return Err(MinervaError::InferenceError(
                 "Initial tokens cannot be empty".to_string(),
             ));
         }
 
-        if initial_tokens.len() + num_tokens > self.max_seq_len {
+        if params.initial_tokens.len() + params.num_tokens > self.max_seq_len {
             return Err(MinervaError::InferenceError(
                 "Sequence too long for max_seq_len".to_string(),
             ));
         }
 
-        let mut tokens = initial_tokens.to_vec();
-        let mut sequence = initial_tokens.to_vec();
+        let mut tokens = params.initial_tokens.to_vec();
+        let mut sequence = params.initial_tokens.to_vec();
 
-        for _ in 0..num_tokens {
+        for _ in 0..params.num_tokens {
             let logits = forward(&tokens)?;
-            let next_token = self.sample_token(&logits, temperature, strategy)?;
+            let sampling = SamplingParams {
+                temperature: params.sampling.temperature,
+                strategy: params.sampling.strategy,
+            };
+            let next_token = self.sample_token(&logits, sampling)?;
             tokens.push(next_token);
             sequence.push(next_token);
         }
@@ -759,7 +814,13 @@ mod tests {
         let decoder = Decoder::new(100, 512);
         let logits = vec![0.1; 100];
         let token = decoder
-            .sample_token(&logits, 1.0, SamplingStrategy::Greedy)
+            .sample_token(
+                &logits,
+                SamplingParams {
+                    temperature: 1.0,
+                    strategy: SamplingStrategy::Greedy,
+                },
+            )
             .unwrap();
         assert!(token < 100);
     }
@@ -772,7 +833,13 @@ mod tests {
         logits[1] = 0.8;
 
         let token = decoder
-            .sample_token(&logits, 1.0, SamplingStrategy::TopK(5))
+            .sample_token(
+                &logits,
+                SamplingParams {
+                    temperature: 1.0,
+                    strategy: SamplingStrategy::TopK(5),
+                },
+            )
             .unwrap();
         assert!(token < 100);
     }
@@ -785,7 +852,13 @@ mod tests {
         logits[1] = 0.9;
 
         let token = decoder
-            .sample_token(&logits, 1.0, SamplingStrategy::TopP(0.9))
+            .sample_token(
+                &logits,
+                SamplingParams {
+                    temperature: 1.0,
+                    strategy: SamplingStrategy::TopP(0.9),
+                },
+            )
             .unwrap();
         assert!(token < 100);
     }
@@ -794,7 +867,13 @@ mod tests {
     fn test_decoder_invalid_temperature() {
         let decoder = Decoder::new(100, 512);
         let logits = vec![0.1; 100];
-        let result = decoder.sample_token(&logits, -1.0, SamplingStrategy::Greedy);
+        let result = decoder.sample_token(
+            &logits,
+            SamplingParams {
+                temperature: -1.0,
+                strategy: SamplingStrategy::Greedy,
+            },
+        );
         assert!(result.is_err());
     }
 
@@ -802,7 +881,13 @@ mod tests {
     fn test_decoder_invalid_topk() {
         let decoder = Decoder::new(100, 512);
         let logits = vec![0.1; 100];
-        let result = decoder.sample_token(&logits, 1.0, SamplingStrategy::TopK(0));
+        let result = decoder.sample_token(
+            &logits,
+            SamplingParams {
+                temperature: 1.0,
+                strategy: SamplingStrategy::TopK(0),
+            },
+        );
         assert!(result.is_err());
     }
 
@@ -810,7 +895,13 @@ mod tests {
     fn test_decoder_invalid_topp() {
         let decoder = Decoder::new(100, 512);
         let logits = vec![0.1; 100];
-        let result = decoder.sample_token(&logits, 1.0, SamplingStrategy::TopP(0.0));
+        let result = decoder.sample_token(
+            &logits,
+            SamplingParams {
+                temperature: 1.0,
+                strategy: SamplingStrategy::TopP(0.0),
+            },
+        );
         assert!(result.is_err());
     }
 
@@ -893,10 +984,20 @@ mod tests {
         let mut call_count = 0;
 
         let result = decoder
-            .generate(&initial, 5, 1.0, SamplingStrategy::Greedy, |_tokens| {
-                call_count += 1;
-                Ok(vec![0.1; 100])
-            })
+            .generate(
+                GenerationParams {
+                    initial_tokens: &initial,
+                    num_tokens: 5,
+                    sampling: SamplingParams {
+                        temperature: 1.0,
+                        strategy: SamplingStrategy::Greedy,
+                    },
+                },
+                |_tokens| {
+                    call_count += 1;
+                    Ok(vec![0.1; 100])
+                },
+            )
             .unwrap();
 
         assert_eq!(result.len(), 6); // initial + 5 generated
