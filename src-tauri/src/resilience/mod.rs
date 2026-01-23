@@ -7,6 +7,7 @@
 /// - Error categorization (recoverable vs fatal)
 /// - Timeout management and deadline propagation
 pub mod circuit_breaker;
+pub mod coordinator;
 pub mod fallback;
 pub mod health;
 pub mod retry;
