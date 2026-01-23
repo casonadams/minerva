@@ -8,6 +8,7 @@ pub mod cache_optimizer;
 pub mod context_manager;
 pub mod garbage_collector;
 pub mod gpu_batch_scheduler;
+pub mod gpu_compute_engine;
 pub mod gpu_context;
 pub mod llama_adapter;
 pub mod llama_engine;

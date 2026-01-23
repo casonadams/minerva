@@ -208,6 +208,7 @@ pub struct MetalDevice {
     /// Buffer registry
     buffers: Arc<Mutex<Vec<GPUBuffer>>>,
     /// Command queue (simulated)
+    #[allow(dead_code)]
     command_queue_id: usize,
     /// Next buffer ID
     next_buffer_id: Arc<Mutex<usize>>,
@@ -467,6 +468,7 @@ pub struct GPUMemoryPool {
     /// Allocated blocks
     allocated_blocks: Arc<Mutex<Vec<(usize, usize)>>>, // (start, size)
     /// Total pool size
+    #[allow(dead_code)]
     total_size: usize,
 }
 
