@@ -30,6 +30,7 @@ pub struct CacheStats {
 #[derive(Debug, Clone)]
 struct CacheEntry {
     /// Model name/path
+    #[allow(dead_code)]
     name: String,
     /// Model data (simplified - in real implementation, would store weights)
     data: Vec<u8>,

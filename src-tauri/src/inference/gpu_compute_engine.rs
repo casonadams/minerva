@@ -83,11 +83,9 @@ pub struct GPUComputeEngine {
 impl GPUComputeEngine {
     /// Create new GPU compute engine
     pub fn new(config: GPUComputeConfig) -> MinervaResult<Self> {
-        let device = if config.use_simulation {
-            Arc::new(MetalDevice::simulated())
-        } else {
-            Arc::new(MetalDevice::simulated()) // CPU fallback for now
-        };
+        let device = Arc::new(MetalDevice::simulated());
+        // Note: Real Metal device creation would occur here if available
+        // Currently using simulated mode for cross-platform compatibility
 
         let memory_pool = Arc::new(GPUMemoryPool::new(config.pool_size));
 
@@ -558,7 +556,7 @@ mod tests {
         let b = vec![2.0, 2.0, 2.0];
 
         let result = engine.compute_element_mul(&a, &b).unwrap();
-        let expected = vec![5.0, 7.0, 3.0];
+        let expected = [5.0, 7.0, 3.0];
 
         for (i, &val) in result.output.iter().enumerate() {
             assert!((val - expected[i]).abs() < 0.01);

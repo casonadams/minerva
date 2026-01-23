@@ -753,8 +753,8 @@ mod tests {
     fn test_sampling_strategy_greedy() {
         let strategy = SamplingStrategy::Greedy;
         match strategy {
-            SamplingStrategy::Greedy => assert!(true),
-            _ => assert!(false),
+            SamplingStrategy::Greedy => {} // Correct variant
+            _ => unreachable!(),
         }
     }
 
@@ -763,7 +763,7 @@ mod tests {
         let strategy = SamplingStrategy::TopK(10);
         match strategy {
             SamplingStrategy::TopK(k) => assert_eq!(k, 10),
-            _ => assert!(false),
+            _ => unreachable!(),
         }
     }
 
@@ -772,7 +772,7 @@ mod tests {
         let strategy = SamplingStrategy::TopP(0.9);
         match strategy {
             SamplingStrategy::TopP(p) => assert!((p - 0.9).abs() < 1e-5),
-            _ => assert!(false),
+            _ => unreachable!(),
         }
     }
 

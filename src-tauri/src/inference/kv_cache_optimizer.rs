@@ -104,6 +104,7 @@ impl LayerKVCache {
 }
 
 /// Multi-layer KV Cache Manager
+#[allow(dead_code)]
 pub struct KVCacheManager {
     /// Per-layer caches
     caches: HashMap<usize, LayerKVCache>,
