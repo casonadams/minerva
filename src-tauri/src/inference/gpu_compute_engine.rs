@@ -58,8 +58,9 @@ pub struct MatmulParams {
 }
 
 impl MatmulParams {
-    /// Create new matmul parameters
-    pub fn new(a: Vec<f32>, b: Vec<f32>, a_rows: usize, a_cols: usize, b_cols: usize) -> Self {
+    /// Create new matmul parameters from data and dimensions
+    pub fn new(a: Vec<f32>, b: Vec<f32>, a_rows: usize, a_cols: usize) -> Self {
+        let b_cols = b.len() / a_cols;
         Self {
             a,
             b,
@@ -86,8 +87,9 @@ pub struct AttentionParams {
 }
 
 impl AttentionParams {
-    /// Create new attention parameters
-    pub fn new(q: Vec<f32>, k: Vec<f32>, v: Vec<f32>, heads: usize, head_dim: usize) -> Self {
+    /// Create new attention parameters from query, key, value and head info
+    pub fn new(q: Vec<f32>, k: Vec<f32>, v: Vec<f32>, heads: usize) -> Self {
+        let head_dim = q.len() / heads;
         Self {
             q,
             k,
@@ -323,7 +325,7 @@ impl GPUComputeEngine {
                 let mut max_score = f32::NEG_INFINITY;
                 let mut scores = vec![0.0; seq_len];
 
-                for j in 0..seq_len {
+                for (j, score_slot) in scores.iter_mut().enumerate() {
                     let mut score = 0.0;
                     for d in 0..params.head_dim {
                         let q_idx = h * seq_len * params.head_dim + i * params.head_dim + d;
@@ -334,7 +336,7 @@ impl GPUComputeEngine {
                     if score > max_score {
                         max_score = score;
                     }
-                    scores[j] = score;
+                    *score_slot = score;
                 }
 
                 // Softmax
@@ -378,8 +380,8 @@ impl GPUComputeEngine {
         let rms = (sum_sq / dim as f32 + params.eps).sqrt();
 
         // Normalize and scale
-        for i in 0..dim {
-            output[i] = (params.x[i] / rms) * params.weight[i];
+        for (i, out_val) in output.iter_mut().enumerate() {
+            *out_val = (params.x[i] / rms) * params.weight[i];
         }
 
         output
@@ -423,7 +425,7 @@ mod tests {
         let a = vec![1.0, 2.0, 3.0, 4.0]; // 2x2
         let b = vec![5.0, 6.0, 7.0, 8.0]; // 2x2
 
-        let params = MatmulParams::new(a, b, 2, 2, 2);
+        let params = MatmulParams::new(a, b, 2, 2);
         let result = engine.compute_matmul(params).unwrap();
 
         // Verify result shape
@@ -488,14 +490,13 @@ mod tests {
     fn test_attention_simple() {
         let engine = GPUComputeEngine::simulated().unwrap();
         let heads = 1;
-        let head_dim = 2;
 
         // Q, K, V: 1 head, 2 positions, 2 dims each
         let q = vec![1.0, 0.0, 0.0, 1.0]; // 2 queries
         let k = vec![1.0, 0.0, 0.0, 1.0]; // 2 keys
         let v = vec![2.0, 3.0, 4.0, 5.0]; // 2 values
 
-        let params = AttentionParams::new(q, k, v, heads, head_dim);
+        let params = AttentionParams::new(q, k, v, heads);
         let result = engine.compute_attention(params).unwrap();
         assert_eq!(result.output.len(), 4);
     }
@@ -507,7 +508,7 @@ mod tests {
         let k = vec![1.0, 2.0];
         let v = vec![1.0, 2.0];
 
-        let params = AttentionParams::new(q, k, v, 2, 2);
+        let params = AttentionParams::new(q, k, v, 2);
         let result = engine.compute_attention(params);
         assert!(result.is_err());
     }
@@ -529,7 +530,7 @@ mod tests {
         let a = vec![1.0; 100];
         let b = vec![1.0; 100];
 
-        let params = MatmulParams::new(a, b, 10, 10, 10);
+        let params = MatmulParams::new(a, b, 10, 10);
         let result = engine.compute_matmul(params).unwrap();
         assert!(result.execution_time_ms >= 0.0);
     }
@@ -546,7 +547,7 @@ mod tests {
         let k = vec![0.5; size];
         let v = vec![1.0; size];
 
-        let params = AttentionParams::new(q, k, v, heads, head_dim);
+        let params = AttentionParams::new(q, k, v, heads);
         let result = engine.compute_attention(params).unwrap();
         assert_eq!(result.output.len(), size);
     }

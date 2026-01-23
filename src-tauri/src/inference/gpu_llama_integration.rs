@@ -111,8 +111,7 @@ impl GPULlamaInference {
         let k = self.project_to_attention(&norm_result.output, k_weight)?;
         let v = self.project_to_attention(&norm_result.output, v_weight)?;
 
-        let attn_params =
-            AttentionParams::new(q, k, v, self.config.num_heads, self.config.head_dim);
+        let attn_params = AttentionParams::new(q, k, v, self.config.num_heads);
         let attn_result = self.compute_engine.compute_attention(attn_params)?;
         let attention_time = attention_start.elapsed().as_secs_f32() * 1000.0;
 
@@ -170,7 +169,6 @@ impl GPULlamaInference {
             weight.to_vec(),
             seq_len,
             self.config.hidden_dim,
-            output_dim,
         );
 
         let result = self.compute_engine.compute_matmul(params)?;
@@ -188,13 +186,7 @@ impl GPULlamaInference {
             ));
         }
 
-        let params = MatmulParams::new(
-            input.to_vec(),
-            weight.to_vec(),
-            seq_len,
-            input_dim,
-            self.config.hidden_dim,
-        );
+        let params = MatmulParams::new(input.to_vec(), weight.to_vec(), seq_len, input_dim);
 
         let result = self.compute_engine.compute_matmul(params)?;
         Ok(result.output)
@@ -215,7 +207,6 @@ impl GPULlamaInference {
             weight.to_vec(),
             seq_len,
             self.config.hidden_dim,
-            self.config.intermediate_dim,
         );
 
         let result = self.compute_engine.compute_matmul(params)?;
@@ -237,7 +228,6 @@ impl GPULlamaInference {
             weight.to_vec(),
             seq_len,
             self.config.intermediate_dim,
-            self.config.hidden_dim,
         );
 
         let result = self.compute_engine.compute_matmul(params)?;
