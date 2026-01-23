@@ -6,6 +6,7 @@
 /// - Memory-aware inference configuration
 /// - UI responsiveness optimization
 pub mod adaptive;
+pub mod integration;
 pub mod profiler;
 
 use std::sync::atomic::{AtomicU64, Ordering};
