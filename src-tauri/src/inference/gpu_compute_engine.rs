@@ -46,6 +46,10 @@ pub struct ComputeResult {
 /// Parameters for matrix multiplication
 #[derive(Debug, Clone)]
 pub struct MatmulParams {
+    /// Matrix A data
+    pub a: Vec<f32>,
+    /// Matrix B data
+    pub b: Vec<f32>,
     /// Matrix A dimensions
     pub a_rows: usize,
     pub a_cols: usize,
@@ -53,20 +57,63 @@ pub struct MatmulParams {
     pub b_cols: usize,
 }
 
+impl MatmulParams {
+    /// Create new matmul parameters
+    pub fn new(a: Vec<f32>, b: Vec<f32>, a_rows: usize, a_cols: usize, b_cols: usize) -> Self {
+        Self {
+            a,
+            b,
+            a_rows,
+            a_cols,
+            b_cols,
+        }
+    }
+}
+
 /// Parameters for attention computation
 #[derive(Debug, Clone)]
 pub struct AttentionParams {
+    /// Query data
+    pub q: Vec<f32>,
+    /// Key data
+    pub k: Vec<f32>,
+    /// Value data
+    pub v: Vec<f32>,
     /// Number of attention heads
     pub heads: usize,
     /// Dimension per head
     pub head_dim: usize,
 }
 
+impl AttentionParams {
+    /// Create new attention parameters
+    pub fn new(q: Vec<f32>, k: Vec<f32>, v: Vec<f32>, heads: usize, head_dim: usize) -> Self {
+        Self {
+            q,
+            k,
+            v,
+            heads,
+            head_dim,
+        }
+    }
+}
+
 /// Parameters for RMSNorm computation
 #[derive(Debug, Clone)]
 pub struct RmsNormParams {
+    /// Input data
+    pub x: Vec<f32>,
+    /// Weight data
+    pub weight: Vec<f32>,
     /// Normalization epsilon
     pub eps: f32,
+}
+
+impl RmsNormParams {
+    /// Create new RMSNorm parameters
+    pub fn new(x: Vec<f32>, weight: Vec<f32>, eps: f32) -> Self {
+        Self { x, weight, eps }
+    }
 }
 
 /// GPU Computation Engine
@@ -117,21 +164,16 @@ impl GPUComputeEngine {
     }
 
     /// Execute matrix multiplication on GPU
-    pub fn compute_matmul(
-        &self,
-        a: &[f32],
-        b: &[f32],
-        params: MatmulParams,
-    ) -> MinervaResult<ComputeResult> {
+    pub fn compute_matmul(&self, params: MatmulParams) -> MinervaResult<ComputeResult> {
         let start = std::time::Instant::now();
 
         if !self.config.enabled {
-            return self.cpu_matmul(a, b, params);
+            return self.cpu_matmul(params);
         }
 
         // For now, fall back to CPU for actual computation
         // In production, this would use GPU kernels
-        let output = self.cpu_matmul_impl(a, b, &params);
+        let output = self.cpu_matmul_impl(&params);
         let elapsed = start.elapsed();
 
         Ok(ComputeResult {
@@ -142,29 +184,23 @@ impl GPUComputeEngine {
     }
 
     /// Execute attention computation on GPU
-    pub fn compute_attention(
-        &self,
-        q: &[f32],
-        k: &[f32],
-        v: &[f32],
-        params: AttentionParams,
-    ) -> MinervaResult<ComputeResult> {
+    pub fn compute_attention(&self, params: AttentionParams) -> MinervaResult<ComputeResult> {
         let start = std::time::Instant::now();
 
         if !self.config.enabled {
-            return self.cpu_attention(q, k, v, params);
+            return self.cpu_attention(params);
         }
 
         // Validate input shapes
-        let seq_len = q.len() / (params.heads * params.head_dim);
-        if q.len() != params.heads * params.head_dim * seq_len {
+        let seq_len = params.q.len() / (params.heads * params.head_dim);
+        if params.q.len() != params.heads * params.head_dim * seq_len {
             return Err(MinervaError::InferenceError(
                 "Invalid attention input shape".to_string(),
             ));
         }
 
         // For now, fall back to CPU
-        let output = self.cpu_attention_impl(q, k, v, &params, seq_len);
+        let output = self.cpu_attention_impl(&params, seq_len);
         let elapsed = start.elapsed();
 
         Ok(ComputeResult {
@@ -204,22 +240,17 @@ impl GPUComputeEngine {
     }
 
     /// Execute RMSNorm on GPU
-    pub fn compute_rmsnorm(
-        &self,
-        x: &[f32],
-        weight: &[f32],
-        params: RmsNormParams,
-    ) -> MinervaResult<ComputeResult> {
+    pub fn compute_rmsnorm(&self, params: RmsNormParams) -> MinervaResult<ComputeResult> {
         let start = std::time::Instant::now();
 
-        if x.len() != weight.len() {
+        if params.x.len() != params.weight.len() {
             return Err(MinervaError::InferenceError(
                 "RMSNorm weight mismatch".to_string(),
             ));
         }
 
         if !self.config.enabled {
-            let output = self.cpu_rmsnorm_impl(x, weight, params.eps);
+            let output = self.cpu_rmsnorm_impl(&params);
             return Ok(ComputeResult {
                 output,
                 execution_time_ms: 0.0,
@@ -227,7 +258,7 @@ impl GPUComputeEngine {
             });
         }
 
-        let output = self.cpu_rmsnorm_impl(x, weight, params.eps);
+        let output = self.cpu_rmsnorm_impl(&params);
         let elapsed = start.elapsed();
 
         Ok(ComputeResult {
@@ -238,14 +269,9 @@ impl GPUComputeEngine {
     }
 
     /// CPU fallback for matrix multiplication
-    fn cpu_matmul(
-        &self,
-        a: &[f32],
-        b: &[f32],
-        params: MatmulParams,
-    ) -> MinervaResult<ComputeResult> {
+    fn cpu_matmul(&self, params: MatmulParams) -> MinervaResult<ComputeResult> {
         let start = std::time::Instant::now();
-        let output = self.cpu_matmul_impl(a, b, &params);
+        let output = self.cpu_matmul_impl(&params);
         let elapsed = start.elapsed();
 
         Ok(ComputeResult {
@@ -256,14 +282,14 @@ impl GPUComputeEngine {
     }
 
     /// CPU implementation of matrix multiplication
-    fn cpu_matmul_impl(&self, a: &[f32], b: &[f32], params: &MatmulParams) -> Vec<f32> {
+    fn cpu_matmul_impl(&self, params: &MatmulParams) -> Vec<f32> {
         let mut c = vec![0.0; params.a_rows * params.b_cols];
 
         for i in 0..params.a_rows {
             for j in 0..params.b_cols {
                 let mut sum = 0.0;
                 for k in 0..params.a_cols {
-                    sum += a[i * params.a_cols + k] * b[k * params.b_cols + j];
+                    sum += params.a[i * params.a_cols + k] * params.b[k * params.b_cols + j];
                 }
                 c[i * params.b_cols + j] = sum;
             }
@@ -273,16 +299,10 @@ impl GPUComputeEngine {
     }
 
     /// CPU fallback for attention
-    fn cpu_attention(
-        &self,
-        q: &[f32],
-        k: &[f32],
-        v: &[f32],
-        params: AttentionParams,
-    ) -> MinervaResult<ComputeResult> {
+    fn cpu_attention(&self, params: AttentionParams) -> MinervaResult<ComputeResult> {
         let start = std::time::Instant::now();
-        let seq_len = q.len() / (params.heads * params.head_dim);
-        let output = self.cpu_attention_impl(q, k, v, &params, seq_len);
+        let seq_len = params.q.len() / (params.heads * params.head_dim);
+        let output = self.cpu_attention_impl(&params, seq_len);
         let elapsed = start.elapsed();
 
         Ok(ComputeResult {
@@ -293,15 +313,8 @@ impl GPUComputeEngine {
     }
 
     /// CPU implementation of attention
-    fn cpu_attention_impl(
-        &self,
-        q: &[f32],
-        k: &[f32],
-        v: &[f32],
-        params: &AttentionParams,
-        seq_len: usize,
-    ) -> Vec<f32> {
-        let mut output = vec![0.0; q.len()];
+    fn cpu_attention_impl(&self, params: &AttentionParams, seq_len: usize) -> Vec<f32> {
+        let mut output = vec![0.0; params.q.len()];
         let scale = 1.0 / (params.head_dim as f32).sqrt();
 
         for h in 0..params.heads {
@@ -315,7 +328,7 @@ impl GPUComputeEngine {
                     for d in 0..params.head_dim {
                         let q_idx = h * seq_len * params.head_dim + i * params.head_dim + d;
                         let k_idx = h * seq_len * params.head_dim + j * params.head_dim + d;
-                        score += q[q_idx] * k[k_idx];
+                        score += params.q[q_idx] * params.k[k_idx];
                     }
                     score *= scale;
                     if score > max_score {
@@ -341,7 +354,7 @@ impl GPUComputeEngine {
                     let mut val = 0.0;
                     for (j, &score) in scores.iter().enumerate() {
                         let v_idx = h * seq_len * params.head_dim + j * params.head_dim + d;
-                        val += score * v[v_idx];
+                        val += score * params.v[v_idx];
                     }
                     let out_idx = h * seq_len * params.head_dim + i * params.head_dim + d;
                     output[out_idx] = val;
@@ -353,20 +366,20 @@ impl GPUComputeEngine {
     }
 
     /// CPU implementation of RMSNorm
-    fn cpu_rmsnorm_impl(&self, x: &[f32], weight: &[f32], eps: f32) -> Vec<f32> {
-        let mut output = vec![0.0; x.len()];
-        let dim = x.len();
+    fn cpu_rmsnorm_impl(&self, params: &RmsNormParams) -> Vec<f32> {
+        let mut output = vec![0.0; params.x.len()];
+        let dim = params.x.len();
 
         // Compute RMS
         let mut sum_sq = 0.0;
-        for &v in x {
+        for &v in &params.x {
             sum_sq += v * v;
         }
-        let rms = (sum_sq / dim as f32 + eps).sqrt();
+        let rms = (sum_sq / dim as f32 + params.eps).sqrt();
 
         // Normalize and scale
         for i in 0..dim {
-            output[i] = (x[i] / rms) * weight[i];
+            output[i] = (params.x[i] / rms) * params.weight[i];
         }
 
         output
@@ -410,12 +423,8 @@ mod tests {
         let a = vec![1.0, 2.0, 3.0, 4.0]; // 2x2
         let b = vec![5.0, 6.0, 7.0, 8.0]; // 2x2
 
-        let params = MatmulParams {
-            a_rows: 2,
-            a_cols: 2,
-            b_cols: 2,
-        };
-        let result = engine.compute_matmul(&a, &b, params).unwrap();
+        let params = MatmulParams::new(a, b, 2, 2, 2);
+        let result = engine.compute_matmul(params).unwrap();
 
         // Verify result shape
         assert_eq!(result.output.len(), 4);
@@ -452,8 +461,8 @@ mod tests {
         let x = vec![1.0, 2.0, 3.0, 4.0];
         let weight = vec![1.0, 1.0, 1.0, 1.0];
 
-        let params = RmsNormParams { eps: 1e-6 };
-        let result = engine.compute_rmsnorm(&x, &weight, params).unwrap();
+        let params = RmsNormParams::new(x, weight, 1e-6);
+        let result = engine.compute_rmsnorm(params).unwrap();
         assert_eq!(result.output.len(), 4);
 
         // RMS should normalize the values
@@ -470,8 +479,8 @@ mod tests {
         let x = vec![1.0, 2.0, 3.0];
         let weight = vec![1.0, 1.0];
 
-        let params = RmsNormParams { eps: 1e-6 };
-        let result = engine.compute_rmsnorm(&x, &weight, params);
+        let params = RmsNormParams::new(x, weight, 1e-6);
+        let result = engine.compute_rmsnorm(params);
         assert!(result.is_err());
     }
 
@@ -486,8 +495,8 @@ mod tests {
         let k = vec![1.0, 0.0, 0.0, 1.0]; // 2 keys
         let v = vec![2.0, 3.0, 4.0, 5.0]; // 2 values
 
-        let params = AttentionParams { heads, head_dim };
-        let result = engine.compute_attention(&q, &k, &v, params).unwrap();
+        let params = AttentionParams::new(q, k, v, heads, head_dim);
+        let result = engine.compute_attention(params).unwrap();
         assert_eq!(result.output.len(), 4);
     }
 
@@ -498,11 +507,8 @@ mod tests {
         let k = vec![1.0, 2.0];
         let v = vec![1.0, 2.0];
 
-        let params = AttentionParams {
-            heads: 2,
-            head_dim: 2,
-        };
-        let result = engine.compute_attention(&q, &k, &v, params);
+        let params = AttentionParams::new(q, k, v, 2, 2);
+        let result = engine.compute_attention(params);
         assert!(result.is_err());
     }
 
@@ -523,12 +529,8 @@ mod tests {
         let a = vec![1.0; 100];
         let b = vec![1.0; 100];
 
-        let params = MatmulParams {
-            a_rows: 10,
-            a_cols: 10,
-            b_cols: 10,
-        };
-        let result = engine.compute_matmul(&a, &b, params).unwrap();
+        let params = MatmulParams::new(a, b, 10, 10, 10);
+        let result = engine.compute_matmul(params).unwrap();
         assert!(result.execution_time_ms >= 0.0);
     }
 
@@ -544,8 +546,8 @@ mod tests {
         let k = vec![0.5; size];
         let v = vec![1.0; size];
 
-        let params = AttentionParams { heads, head_dim };
-        let result = engine.compute_attention(&q, &k, &v, params).unwrap();
+        let params = AttentionParams::new(q, k, v, heads, head_dim);
+        let result = engine.compute_attention(params).unwrap();
         assert_eq!(result.output.len(), size);
     }
 

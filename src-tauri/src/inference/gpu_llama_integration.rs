@@ -102,10 +102,8 @@ impl GPULlamaInference {
         }
 
         // Layer normalization
-        let norm_params = RmsNormParams { eps: 1e-6 };
-        let norm_result =
-            self.compute_engine
-                .compute_rmsnorm(input, norm_weight, norm_params.clone())?;
+        let norm_params = RmsNormParams::new(input.to_vec(), norm_weight.to_vec(), 1e-6);
+        let norm_result = self.compute_engine.compute_rmsnorm(norm_params)?;
 
         // Attention computation
         let attention_start = std::time::Instant::now();
@@ -113,13 +111,9 @@ impl GPULlamaInference {
         let k = self.project_to_attention(&norm_result.output, k_weight)?;
         let v = self.project_to_attention(&norm_result.output, v_weight)?;
 
-        let attn_params = AttentionParams {
-            heads: self.config.num_heads,
-            head_dim: self.config.head_dim,
-        };
-        let attn_result = self
-            .compute_engine
-            .compute_attention(&q, &k, &v, attn_params)?;
+        let attn_params =
+            AttentionParams::new(q, k, v, self.config.num_heads, self.config.head_dim);
+        let attn_result = self.compute_engine.compute_attention(attn_params)?;
         let attention_time = attention_start.elapsed().as_secs_f32() * 1000.0;
 
         // Output projection
@@ -130,9 +124,8 @@ impl GPULlamaInference {
 
         // FFN computation
         let ffn_start = std::time::Instant::now();
-        let norm_result =
-            self.compute_engine
-                .compute_rmsnorm(&residual, norm_weight, norm_params)?;
+        let norm_params2 = RmsNormParams::new(residual.clone(), norm_weight.to_vec(), 1e-6);
+        let norm_result = self.compute_engine.compute_rmsnorm(norm_params2)?;
 
         // Gate mechanism: x * sigmoid(gate(x))
         let gate_proj = self.project_to_ffn(&norm_result.output, ffn_gate)?;
@@ -172,13 +165,15 @@ impl GPULlamaInference {
             ));
         }
 
-        let params = MatmulParams {
-            a_rows: seq_len,
-            a_cols: self.config.hidden_dim,
-            b_cols: output_dim,
-        };
+        let params = MatmulParams::new(
+            input.to_vec(),
+            weight.to_vec(),
+            seq_len,
+            self.config.hidden_dim,
+            output_dim,
+        );
 
-        let result = self.compute_engine.compute_matmul(input, weight, params)?;
+        let result = self.compute_engine.compute_matmul(params)?;
         Ok(result.output)
     }
 
@@ -193,13 +188,15 @@ impl GPULlamaInference {
             ));
         }
 
-        let params = MatmulParams {
-            a_rows: seq_len,
-            a_cols: input_dim,
-            b_cols: self.config.hidden_dim,
-        };
+        let params = MatmulParams::new(
+            input.to_vec(),
+            weight.to_vec(),
+            seq_len,
+            input_dim,
+            self.config.hidden_dim,
+        );
 
-        let result = self.compute_engine.compute_matmul(input, weight, params)?;
+        let result = self.compute_engine.compute_matmul(params)?;
         Ok(result.output)
     }
 
@@ -213,13 +210,15 @@ impl GPULlamaInference {
             ));
         }
 
-        let params = MatmulParams {
-            a_rows: seq_len,
-            a_cols: self.config.hidden_dim,
-            b_cols: self.config.intermediate_dim,
-        };
+        let params = MatmulParams::new(
+            input.to_vec(),
+            weight.to_vec(),
+            seq_len,
+            self.config.hidden_dim,
+            self.config.intermediate_dim,
+        );
 
-        let result = self.compute_engine.compute_matmul(input, weight, params)?;
+        let result = self.compute_engine.compute_matmul(params)?;
         Ok(result.output)
     }
 
@@ -233,13 +232,15 @@ impl GPULlamaInference {
             ));
         }
 
-        let params = MatmulParams {
-            a_rows: seq_len,
-            a_cols: self.config.intermediate_dim,
-            b_cols: self.config.hidden_dim,
-        };
+        let params = MatmulParams::new(
+            input.to_vec(),
+            weight.to_vec(),
+            seq_len,
+            self.config.intermediate_dim,
+            self.config.hidden_dim,
+        );
 
-        let result = self.compute_engine.compute_matmul(input, weight, params)?;
+        let result = self.compute_engine.compute_matmul(params)?;
         Ok(result.output)
     }
 
