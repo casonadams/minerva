@@ -1,3 +1,17 @@
+// Phases 1-3.5: Core Functionality
+pub mod error_recovery_e2e; // Error recovery and resilience patterns
+pub mod gpu_and_parameters; // GPU context and parameter validation
+pub mod inference_engine; // Inference engine lifecycle
+pub mod model_discovery; // Model discovery and registry
+pub mod streaming; // Token streaming and backend abstraction
+
+// Phase 4 Steps 1-2: Multi-Model Support & Caching
+pub mod context_management; // Context lifecycle and memory tracking
+pub mod model_caching; // LRU/LFU/FIFO cache strategies
+pub mod model_registry; // Model registry and cache management
+pub mod multimodel_support; // Multi-model context management
+pub mod preloading; // Preload manager and strategies
+
 // Phase 4 Step 3: Advanced Parameter Tuning & Optimization
 pub mod phase4_step3;
 
@@ -7,15 +21,8 @@ pub mod tokenization; // Real tokenization and vocabulary support
 // Phase 4 Step 6: Batch Processing
 pub mod batch_processing; // Batch processing for tokenization and inference
 
-// Phases 1-3.5: Core Functionality
-pub mod error_recovery_e2e;
-pub mod gpu_and_parameters; // GPU context and parameter validation
-pub mod inference_engine; // Inference engine lifecycle
-pub mod model_discovery; // Model discovery and registry
-pub mod streaming; // Token streaming and backend abstraction
-
-// Phase 4 Steps 1-2: Multi-Model Support
-pub mod multimodel_support; // Multi-model caching and preloading
+// Phase 6 & 7: Performance and Observability
+pub mod performance_metrics; // Performance tracking and benchmarking
 
 use std::fs;
 use std::path::{Path, PathBuf};
