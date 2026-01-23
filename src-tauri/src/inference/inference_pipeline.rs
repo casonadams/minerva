@@ -1,3 +1,4 @@
+use super::gpu_llama_integration::TransformerBlockParams;
 use super::gpu_llama_integration::{GPUInferenceConfig, GPULlamaInference};
 use super::llama_tokenizer::LLaMATokenizer;
 /// Real Model Inference Pipeline - Phase 6 Step 5
@@ -141,17 +142,18 @@ impl InferencePipeline {
 
             // Run inference step (simplified - in reality would use actual model weights)
             let step_start = std::time::Instant::now();
-            let _gpu_result = self.gpu_inference.forward_block(
-                &_hidden_state,
-                &_q_weight,
-                &_k_weight,
-                &_v_weight,
-                &_o_weight,
-                &_ffn_up,
-                &_ffn_down,
-                &_ffn_gate,
-                &_norm_weight,
-            )?;
+            let params = TransformerBlockParams::new(
+                _hidden_state,
+                _q_weight,
+                _k_weight,
+                _v_weight,
+                _o_weight,
+                _ffn_up,
+                _ffn_down,
+                _ffn_gate,
+                _norm_weight,
+            );
+            let _gpu_result = self.gpu_inference.forward_block(params)?;
             let _step_time = step_start.elapsed().as_secs_f32() * 1000.0;
 
             // Sample next token (simplified)

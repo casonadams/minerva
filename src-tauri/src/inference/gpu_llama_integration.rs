@@ -54,6 +54,56 @@ pub struct GPUInferenceResult {
     pub used_gpu: bool,
 }
 
+/// Parameters for transformer block computation
+#[derive(Debug, Clone)]
+pub struct TransformerBlockParams {
+    /// Input embeddings
+    pub input: Vec<f32>,
+    /// Attention query weight
+    pub q_weight: Vec<f32>,
+    /// Attention key weight
+    pub k_weight: Vec<f32>,
+    /// Attention value weight
+    pub v_weight: Vec<f32>,
+    /// Attention output weight
+    pub o_weight: Vec<f32>,
+    /// FFN up weight
+    pub ffn_up: Vec<f32>,
+    /// FFN down weight
+    pub ffn_down: Vec<f32>,
+    /// FFN gate weight
+    pub ffn_gate: Vec<f32>,
+    /// Layer norm weight
+    pub norm_weight: Vec<f32>,
+}
+
+impl TransformerBlockParams {
+    /// Create new transformer block params
+    pub fn new(
+        input: Vec<f32>,
+        q_weight: Vec<f32>,
+        k_weight: Vec<f32>,
+        v_weight: Vec<f32>,
+        o_weight: Vec<f32>,
+        ffn_up: Vec<f32>,
+        ffn_down: Vec<f32>,
+        ffn_gate: Vec<f32>,
+        norm_weight: Vec<f32>,
+    ) -> Self {
+        Self {
+            input,
+            q_weight,
+            k_weight,
+            v_weight,
+            o_weight,
+            ffn_up,
+            ffn_down,
+            ffn_gate,
+            norm_weight,
+        }
+    }
+}
+
 /// GPU-Integrated LLaMA Inference Engine
 pub struct GPULlamaInference {
     /// GPU compute engine
@@ -80,55 +130,48 @@ impl GPULlamaInference {
     /// Execute single transformer block with GPU acceleration
     pub fn forward_block(
         &self,
-        input: &[f32],
-        q_weight: &[f32],
-        k_weight: &[f32],
-        v_weight: &[f32],
-        o_weight: &[f32],
-        ffn_up: &[f32],
-        ffn_down: &[f32],
-        ffn_gate: &[f32],
-        norm_weight: &[f32],
+        params: TransformerBlockParams,
     ) -> MinervaResult<GPUInferenceResult> {
         let total_start = std::time::Instant::now();
 
         // Validate input shape
-        if input.len() != self.config.hidden_dim {
+        if params.input.len() != self.config.hidden_dim {
             return Err(MinervaError::InferenceError(format!(
                 "Input dimension mismatch: expected {}, got {}",
                 self.config.hidden_dim,
-                input.len()
+                params.input.len()
             )));
         }
 
         // Layer normalization
-        let norm_params = RmsNormParams::new(input.to_vec(), norm_weight.to_vec(), 1e-6);
+        let norm_params =
+            RmsNormParams::new(params.input.clone(), params.norm_weight.clone(), 1e-6);
         let norm_result = self.compute_engine.compute_rmsnorm(norm_params)?;
 
         // Attention computation
         let attention_start = std::time::Instant::now();
-        let q = self.project_to_attention(&norm_result.output, q_weight)?;
-        let k = self.project_to_attention(&norm_result.output, k_weight)?;
-        let v = self.project_to_attention(&norm_result.output, v_weight)?;
+        let q = self.project_to_attention(&norm_result.output, &params.q_weight)?;
+        let k = self.project_to_attention(&norm_result.output, &params.k_weight)?;
+        let v = self.project_to_attention(&norm_result.output, &params.v_weight)?;
 
         let attn_params = AttentionParams::new(q, k, v, self.config.num_heads);
         let attn_result = self.compute_engine.compute_attention(attn_params)?;
         let attention_time = attention_start.elapsed().as_secs_f32() * 1000.0;
 
         // Output projection
-        let attn_out = self.project_output(&attn_result.output, o_weight)?;
+        let attn_out = self.project_output(&attn_result.output, &params.o_weight)?;
 
         // Residual connection
-        let residual = self.add_residual(input, &attn_out);
+        let residual = self.add_residual(&params.input, &attn_out);
 
         // FFN computation
         let ffn_start = std::time::Instant::now();
-        let norm_params2 = RmsNormParams::new(residual.clone(), norm_weight.to_vec(), 1e-6);
+        let norm_params2 = RmsNormParams::new(residual.clone(), params.norm_weight.clone(), 1e-6);
         let norm_result = self.compute_engine.compute_rmsnorm(norm_params2)?;
 
         // Gate mechanism: x * sigmoid(gate(x))
-        let gate_proj = self.project_to_ffn(&norm_result.output, ffn_gate)?;
-        let up_proj = self.project_to_ffn(&norm_result.output, ffn_up)?;
+        let gate_proj = self.project_to_ffn(&norm_result.output, &params.ffn_gate)?;
+        let up_proj = self.project_to_ffn(&norm_result.output, &params.ffn_up)?;
 
         let gated = self.apply_silu_gate(&up_proj, &gate_proj)?;
         let ffn_result = self
@@ -136,7 +179,7 @@ impl GPULlamaInference {
             .compute_element_mul(&gated, &gate_proj)?;
 
         // Down projection
-        let ffn_out = self.project_from_ffn(&ffn_result.output, ffn_down)?;
+        let ffn_out = self.project_from_ffn(&ffn_result.output, &params.ffn_down)?;
         let ffn_time = ffn_start.elapsed().as_secs_f32() * 1000.0;
 
         // Final residual connection
@@ -322,17 +365,18 @@ mod tests {
         let ffn_gate = vec![0.1; hidden_dim * intermediate_dim];
         let norm_weight = vec![1.0; hidden_dim];
 
-        let result = inference.forward_block(
-            &input,
-            &q_weight,
-            &k_weight,
-            &v_weight,
-            &o_weight,
-            &ffn_up,
-            &ffn_down,
-            &ffn_gate,
-            &norm_weight,
+        let params = TransformerBlockParams::new(
+            input,
+            q_weight,
+            k_weight,
+            v_weight,
+            o_weight,
+            ffn_up,
+            ffn_down,
+            ffn_gate,
+            norm_weight,
         );
+        let result = inference.forward_block(params);
 
         assert!(result.is_ok());
         let res = result.unwrap();
@@ -348,9 +392,18 @@ mod tests {
         let input = vec![0.5; 256]; // Wrong size
         let weights = vec![0.1; 512 * 512];
 
-        let result = inference.forward_block(
-            &input, &weights, &weights, &weights, &weights, &weights, &weights, &weights, &weights,
+        let params = TransformerBlockParams::new(
+            input,
+            weights.clone(),
+            weights.clone(),
+            weights.clone(),
+            weights.clone(),
+            weights.clone(),
+            weights.clone(),
+            weights.clone(),
+            weights,
         );
+        let result = inference.forward_block(params);
 
         assert!(result.is_err());
     }
