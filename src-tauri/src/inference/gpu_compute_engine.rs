@@ -58,8 +58,9 @@ pub struct MatmulParams {
 }
 
 impl MatmulParams {
-    /// Create new matmul parameters from data and dimensions
-    pub fn new(a: Vec<f32>, b: Vec<f32>, a_rows: usize, a_cols: usize) -> Self {
+    /// Create new matmul parameters from matrices
+    pub fn new(a: Vec<f32>, b: Vec<f32>, a_rows: usize) -> Self {
+        let a_cols = a.len() / a_rows;
         let b_cols = b.len() / a_cols;
         Self {
             a,
@@ -87,9 +88,13 @@ pub struct AttentionParams {
 }
 
 impl AttentionParams {
-    /// Create new attention parameters from query, key, value and head info
-    pub fn new(q: Vec<f32>, k: Vec<f32>, v: Vec<f32>, heads: usize) -> Self {
-        let head_dim = q.len() / heads;
+    /// Create new attention parameters from query, key, and value
+    pub fn new(q: Vec<f32>, k: Vec<f32>, v: Vec<f32>) -> Self {
+        // Assume square layout: total_size = heads * seq_len * head_dim
+        // For simplicity, use sqrt to estimate heads*head_dim, then derive from context
+        let total_dim = q.len();
+        let heads = 8; // Default, should be set explicitly in real usage
+        let head_dim = total_dim / heads;
         Self {
             q,
             k,
@@ -97,6 +102,13 @@ impl AttentionParams {
             heads,
             head_dim,
         }
+    }
+
+    /// Set number of attention heads
+    pub fn with_heads(mut self, heads: usize) -> Self {
+        self.heads = heads;
+        self.head_dim = self.q.len() / heads;
+        self
     }
 }
 
@@ -425,7 +437,7 @@ mod tests {
         let a = vec![1.0, 2.0, 3.0, 4.0]; // 2x2
         let b = vec![5.0, 6.0, 7.0, 8.0]; // 2x2
 
-        let params = MatmulParams::new(a, b, 2, 2);
+        let params = MatmulParams::new(a, b, 2);
         let result = engine.compute_matmul(params).unwrap();
 
         // Verify result shape
@@ -496,7 +508,7 @@ mod tests {
         let k = vec![1.0, 0.0, 0.0, 1.0]; // 2 keys
         let v = vec![2.0, 3.0, 4.0, 5.0]; // 2 values
 
-        let params = AttentionParams::new(q, k, v, heads);
+        let params = AttentionParams::new(q, k, v).with_heads(heads);
         let result = engine.compute_attention(params).unwrap();
         assert_eq!(result.output.len(), 4);
     }
@@ -508,7 +520,7 @@ mod tests {
         let k = vec![1.0, 2.0];
         let v = vec![1.0, 2.0];
 
-        let params = AttentionParams::new(q, k, v, 2);
+        let params = AttentionParams::new(q, k, v).with_heads(2);
         let result = engine.compute_attention(params);
         assert!(result.is_err());
     }
@@ -530,7 +542,7 @@ mod tests {
         let a = vec![1.0; 100];
         let b = vec![1.0; 100];
 
-        let params = MatmulParams::new(a, b, 10, 10);
+        let params = MatmulParams::new(a, b, 10);
         let result = engine.compute_matmul(params).unwrap();
         assert!(result.execution_time_ms >= 0.0);
     }
@@ -547,7 +559,7 @@ mod tests {
         let k = vec![0.5; size];
         let v = vec![1.0; size];
 
-        let params = AttentionParams::new(q, k, v, heads);
+        let params = AttentionParams::new(q, k, v).with_heads(heads);
         let result = engine.compute_attention(params).unwrap();
         assert_eq!(result.output.len(), size);
     }

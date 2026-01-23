@@ -142,17 +142,16 @@ impl InferencePipeline {
 
             // Run inference step (simplified - in reality would use actual model weights)
             let step_start = std::time::Instant::now();
-            let params = TransformerBlockParams::new(
-                _hidden_state,
-                _q_weight,
-                _k_weight,
-                _v_weight,
-                _o_weight,
-                _ffn_up,
-                _ffn_down,
-                _ffn_gate,
-                _norm_weight,
-            );
+            let params = TransformerBlockParams::builder(_hidden_state)
+                .q_weight(_q_weight)
+                .k_weight(_k_weight)
+                .v_weight(_v_weight)
+                .o_weight(_o_weight)
+                .ffn_up(_ffn_up)
+                .ffn_down(_ffn_down)
+                .ffn_gate(_ffn_gate)
+                .norm_weight(_norm_weight)
+                .into_params();
             let _gpu_result = self.gpu_inference.forward_block(params)?;
             let _step_time = step_start.elapsed().as_secs_f32() * 1000.0;
 

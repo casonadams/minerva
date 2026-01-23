@@ -61,9 +61,46 @@ pub struct KVStoreParams {
 }
 
 impl KVStoreParams {
-    /// Create new KV store params
-    pub fn new(layer: usize, pos: usize, k: Vec<f32>, v: Vec<f32>) -> Self {
-        Self { layer, pos, k, v }
+    /// Create builder for KV store params
+    pub fn builder(k: Vec<f32>, v: Vec<f32>) -> KVStoreParamsBuilder {
+        KVStoreParamsBuilder {
+            layer: 0,
+            pos: 0,
+            k,
+            v,
+        }
+    }
+}
+
+/// Builder for KVStoreParams to reduce function parameters
+pub struct KVStoreParamsBuilder {
+    layer: usize,
+    pos: usize,
+    k: Vec<f32>,
+    v: Vec<f32>,
+}
+
+impl KVStoreParamsBuilder {
+    /// Set layer index
+    pub fn layer(mut self, layer: usize) -> Self {
+        self.layer = layer;
+        self
+    }
+
+    /// Set position index
+    pub fn pos(mut self, pos: usize) -> Self {
+        self.pos = pos;
+        self
+    }
+
+    /// Build KVStoreParams
+    pub fn build(self) -> KVStoreParams {
+        KVStoreParams {
+            layer: self.layer,
+            pos: self.pos,
+            k: self.k,
+            v: self.v,
+        }
     }
 }
 
@@ -637,7 +674,7 @@ mod tests {
         let k = vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
         let v = vec![0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
 
-        let params = KVStoreParams::new(0, 0, k, v);
+        let params = KVStoreParams::builder(k, v).layer(0).pos(0).build();
         assert!(cache.store(params).is_ok());
         let (k_retrieved, v_retrieved) = cache.get(0, 0).unwrap();
         assert_eq!(k_retrieved.len(), 8);
@@ -823,7 +860,7 @@ mod tests {
         let mut cache = KVCache::new(config);
         let k = vec![0.5; 128];
         let v = vec![0.5; 128];
-        let params = KVStoreParams::new(0, 0, k, v);
+        let params = KVStoreParams::builder(k, v).layer(0).pos(0).build();
         cache.store(params).unwrap();
 
         cache.clear();

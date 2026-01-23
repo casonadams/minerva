@@ -9,6 +9,37 @@
 use crate::error::{MinervaError, MinervaResult};
 use std::collections::HashMap;
 
+/// Range for KV cache slicing
+#[derive(Debug, Clone, Copy)]
+pub struct CacheRange {
+    /// Start index
+    pub start: usize,
+    /// End index (exclusive)
+    pub end: usize,
+}
+
+impl CacheRange {
+    /// Create new cache range
+    pub fn new(start: usize, end: usize) -> Self {
+        Self { start, end }
+    }
+}
+
+/// KV pair for cache operations
+pub struct KVPair<'a> {
+    /// Key data
+    pub keys: &'a [f32],
+    /// Value data
+    pub values: &'a [f32],
+}
+
+impl<'a> KVPair<'a> {
+    /// Create new KV pair
+    pub fn new(keys: &'a [f32], values: &'a [f32]) -> Self {
+        Self { keys, values }
+    }
+}
+
 /// KV Cache entry for a single layer
 #[derive(Debug, Clone)]
 pub struct LayerKVCache {
@@ -139,12 +170,7 @@ impl KVCacheManager {
     }
 
     /// Add keys and values for a layer
-    pub fn add_layer_cache(
-        &mut self,
-        layer_id: usize,
-        keys: &[f32],
-        values: &[f32],
-    ) -> MinervaResult<()> {
+    pub fn add_layer_cache(&mut self, layer_id: usize, kv: KVPair) -> MinervaResult<()> {
         if layer_id >= self.num_layers {
             return Err(MinervaError::InferenceError(format!(
                 "Layer ID {} out of range",
@@ -153,7 +179,7 @@ impl KVCacheManager {
         }
 
         if let Some(cache) = self.caches.get_mut(&layer_id) {
-            cache.append(keys, values)
+            cache.append(kv.keys, kv.values)
         } else {
             Err(MinervaError::InferenceError(
                 "Cache not initialized".to_string(),
@@ -162,28 +188,18 @@ impl KVCacheManager {
     }
 
     /// Get cached keys for a layer
-    pub fn get_cached_keys(
-        &self,
-        layer_id: usize,
-        start: usize,
-        end: usize,
-    ) -> MinervaResult<Vec<f32>> {
+    pub fn get_cached_keys(&self, layer_id: usize, range: CacheRange) -> MinervaResult<Vec<f32>> {
         if let Some(cache) = self.caches.get(&layer_id) {
-            cache.get_keys(start, end)
+            cache.get_keys(range.start, range.end)
         } else {
             Err(MinervaError::InferenceError("Cache not found".to_string()))
         }
     }
 
     /// Get cached values for a layer
-    pub fn get_cached_values(
-        &self,
-        layer_id: usize,
-        start: usize,
-        end: usize,
-    ) -> MinervaResult<Vec<f32>> {
+    pub fn get_cached_values(&self, layer_id: usize, range: CacheRange) -> MinervaResult<Vec<f32>> {
         if let Some(cache) = self.caches.get(&layer_id) {
-            cache.get_values(start, end)
+            cache.get_values(range.start, range.end)
         } else {
             Err(MinervaError::InferenceError("Cache not found".to_string()))
         }
@@ -375,7 +391,9 @@ mod tests {
         let keys = vec![0.5; 512];
         let values = vec![0.5; 512];
 
-        assert!(manager.add_layer_cache(0, &keys, &values).is_ok());
+        assert!(manager
+            .add_layer_cache(0, KVPair::new(&keys, &values))
+            .is_ok());
         assert_eq!(manager.seq_len(0).unwrap(), 512); // 512 elements added
     }
 
@@ -385,10 +403,12 @@ mod tests {
         let keys = vec![0.5; 256];
         let values = vec![0.5; 256];
 
-        assert!(manager.add_layer_cache(0, &keys, &values).is_ok());
+        assert!(manager
+            .add_layer_cache(0, KVPair::new(&keys, &values))
+            .is_ok());
         assert_eq!(manager.seq_len(0).unwrap(), 256);
 
-        let retrieved = manager.get_cached_keys(0, 0, 256).unwrap();
+        let retrieved = manager.get_cached_keys(0, CacheRange::new(0, 256)).unwrap();
         assert_eq!(retrieved.len(), 256);
     }
 
@@ -398,8 +418,12 @@ mod tests {
         let keys = vec![0.5; 256]; // Smaller size to avoid overflow
         let values = vec![0.5; 256];
 
-        manager.add_layer_cache(0, &keys, &values).unwrap();
-        manager.add_layer_cache(1, &keys, &values).unwrap();
+        manager
+            .add_layer_cache(0, KVPair::new(&keys, &values))
+            .unwrap();
+        manager
+            .add_layer_cache(1, KVPair::new(&keys, &values))
+            .unwrap();
 
         manager.clear_all();
         assert_eq!(manager.seq_len(0).unwrap(), 0);
@@ -412,8 +436,12 @@ mod tests {
         let keys = vec![0.5; 256];
         let values = vec![0.5; 256];
 
-        manager.add_layer_cache(0, &keys, &values).unwrap();
-        manager.add_layer_cache(1, &keys, &values).unwrap();
+        manager
+            .add_layer_cache(0, KVPair::new(&keys, &values))
+            .unwrap();
+        manager
+            .add_layer_cache(1, KVPair::new(&keys, &values))
+            .unwrap();
 
         manager.clear_layer(0).unwrap();
         assert_eq!(manager.seq_len(0).unwrap(), 0);
@@ -426,7 +454,9 @@ mod tests {
         let keys = vec![0.5; 256];
         let values = vec![0.5; 256];
 
-        manager.add_layer_cache(0, &keys, &values).unwrap();
+        manager
+            .add_layer_cache(0, KVPair::new(&keys, &values))
+            .unwrap();
 
         let memory = manager.total_memory_usage();
         assert!(memory > 0);
@@ -438,7 +468,9 @@ mod tests {
         let keys = vec![0.5; 64]; // Exactly cache size
         let values = vec![0.5; 64];
 
-        manager.add_layer_cache(0, &keys, &values).unwrap();
+        manager
+            .add_layer_cache(0, KVPair::new(&keys, &values))
+            .unwrap();
 
         assert!(manager.is_full(0).unwrap());
     }
@@ -452,7 +484,9 @@ mod tests {
         let initial = manager.remaining_capacity(0).unwrap();
         assert_eq!(initial, 256);
 
-        manager.add_layer_cache(0, &keys, &values).unwrap();
+        manager
+            .add_layer_cache(0, KVPair::new(&keys, &values))
+            .unwrap();
         let after = manager.remaining_capacity(0).unwrap();
         assert_eq!(after, 0); // All capacity used
     }
@@ -463,7 +497,9 @@ mod tests {
         let keys = vec![0.5; 256];
         let values = vec![0.5; 256];
 
-        manager.add_layer_cache(0, &keys, &values).unwrap();
+        manager
+            .add_layer_cache(0, KVPair::new(&keys, &values))
+            .unwrap();
 
         let stats = manager.get_stats();
         assert_eq!(stats.len(), 3);

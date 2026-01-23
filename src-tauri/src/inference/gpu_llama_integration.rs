@@ -78,28 +78,106 @@ pub struct TransformerBlockParams {
 }
 
 impl TransformerBlockParams {
-    /// Create new transformer block params
-    pub fn new(
-        input: Vec<f32>,
-        q_weight: Vec<f32>,
-        k_weight: Vec<f32>,
-        v_weight: Vec<f32>,
-        o_weight: Vec<f32>,
-        ffn_up: Vec<f32>,
-        ffn_down: Vec<f32>,
-        ffn_gate: Vec<f32>,
-        norm_weight: Vec<f32>,
-    ) -> Self {
+    /// Create builder for transformer block params
+    pub fn builder(input: Vec<f32>) -> TransformerBlockParamsBuilder {
+        TransformerBlockParamsBuilder::new(input)
+    }
+}
+
+/// Builder for TransformerBlockParams to reduce function parameters
+pub struct TransformerBlockParamsBuilder {
+    input: Vec<f32>,
+    q_weight: Option<Vec<f32>>,
+    k_weight: Option<Vec<f32>>,
+    v_weight: Option<Vec<f32>>,
+    o_weight: Option<Vec<f32>>,
+    ffn_up: Option<Vec<f32>>,
+    ffn_down: Option<Vec<f32>>,
+    ffn_gate: Option<Vec<f32>>,
+    norm_weight: Option<Vec<f32>>,
+}
+
+impl TransformerBlockParamsBuilder {
+    /// Create new builder with input
+    fn new(input: Vec<f32>) -> Self {
         Self {
             input,
-            q_weight,
-            k_weight,
-            v_weight,
-            o_weight,
-            ffn_up,
-            ffn_down,
-            ffn_gate,
-            norm_weight,
+            q_weight: None,
+            k_weight: None,
+            v_weight: None,
+            o_weight: None,
+            ffn_up: None,
+            ffn_down: None,
+            ffn_gate: None,
+            norm_weight: None,
+        }
+    }
+
+    /// Set query weight
+    pub fn q_weight(mut self, w: Vec<f32>) -> Self {
+        self.q_weight = Some(w);
+        self
+    }
+
+    /// Set key weight
+    pub fn k_weight(mut self, w: Vec<f32>) -> Self {
+        self.k_weight = Some(w);
+        self
+    }
+
+    /// Set value weight
+    pub fn v_weight(mut self, w: Vec<f32>) -> Self {
+        self.v_weight = Some(w);
+        self
+    }
+
+    /// Set output weight
+    pub fn o_weight(mut self, w: Vec<f32>) -> Self {
+        self.o_weight = Some(w);
+        self
+    }
+
+    /// Set FFN up weight
+    pub fn ffn_up(mut self, w: Vec<f32>) -> Self {
+        self.ffn_up = Some(w);
+        self
+    }
+
+    /// Set FFN down weight
+    pub fn ffn_down(mut self, w: Vec<f32>) -> Self {
+        self.ffn_down = Some(w);
+        self
+    }
+
+    /// Set FFN gate weight
+    pub fn ffn_gate(mut self, w: Vec<f32>) -> Self {
+        self.ffn_gate = Some(w);
+        self
+    }
+
+    /// Set norm weight
+    pub fn norm_weight(mut self, w: Vec<f32>) -> Self {
+        self.norm_weight = Some(w);
+        self
+    }
+
+    /// Build transformer block params
+    pub fn build(self) -> Self {
+        self
+    }
+
+    /// Convert to TransformerBlockParams (panics if any weight is missing)
+    pub fn into_params(self) -> TransformerBlockParams {
+        TransformerBlockParams {
+            input: self.input,
+            q_weight: self.q_weight.expect("q_weight not set"),
+            k_weight: self.k_weight.expect("k_weight not set"),
+            v_weight: self.v_weight.expect("v_weight not set"),
+            o_weight: self.o_weight.expect("o_weight not set"),
+            ffn_up: self.ffn_up.expect("ffn_up not set"),
+            ffn_down: self.ffn_down.expect("ffn_down not set"),
+            ffn_gate: self.ffn_gate.expect("ffn_gate not set"),
+            norm_weight: self.norm_weight.expect("norm_weight not set"),
         }
     }
 }
@@ -154,7 +232,7 @@ impl GPULlamaInference {
         let k = self.project_to_attention(&norm_result.output, &params.k_weight)?;
         let v = self.project_to_attention(&norm_result.output, &params.v_weight)?;
 
-        let attn_params = AttentionParams::new(q, k, v, self.config.num_heads);
+        let attn_params = AttentionParams::new(q, k, v).with_heads(self.config.num_heads);
         let attn_result = self.compute_engine.compute_attention(attn_params)?;
         let attention_time = attention_start.elapsed().as_secs_f32() * 1000.0;
 
@@ -207,12 +285,7 @@ impl GPULlamaInference {
             ));
         }
 
-        let params = MatmulParams::new(
-            input.to_vec(),
-            weight.to_vec(),
-            seq_len,
-            self.config.hidden_dim,
-        );
+        let params = MatmulParams::new(input.to_vec(), weight.to_vec(), seq_len);
 
         let result = self.compute_engine.compute_matmul(params)?;
         Ok(result.output)
@@ -229,7 +302,7 @@ impl GPULlamaInference {
             ));
         }
 
-        let params = MatmulParams::new(input.to_vec(), weight.to_vec(), seq_len, input_dim);
+        let params = MatmulParams::new(input.to_vec(), weight.to_vec(), seq_len);
 
         let result = self.compute_engine.compute_matmul(params)?;
         Ok(result.output)
@@ -245,12 +318,7 @@ impl GPULlamaInference {
             ));
         }
 
-        let params = MatmulParams::new(
-            input.to_vec(),
-            weight.to_vec(),
-            seq_len,
-            self.config.hidden_dim,
-        );
+        let params = MatmulParams::new(input.to_vec(), weight.to_vec(), seq_len);
 
         let result = self.compute_engine.compute_matmul(params)?;
         Ok(result.output)
@@ -266,12 +334,7 @@ impl GPULlamaInference {
             ));
         }
 
-        let params = MatmulParams::new(
-            input.to_vec(),
-            weight.to_vec(),
-            seq_len,
-            self.config.intermediate_dim,
-        );
+        let params = MatmulParams::new(input.to_vec(), weight.to_vec(), seq_len);
 
         let result = self.compute_engine.compute_matmul(params)?;
         Ok(result.output)
@@ -365,17 +428,16 @@ mod tests {
         let ffn_gate = vec![0.1; hidden_dim * intermediate_dim];
         let norm_weight = vec![1.0; hidden_dim];
 
-        let params = TransformerBlockParams::new(
-            input,
-            q_weight,
-            k_weight,
-            v_weight,
-            o_weight,
-            ffn_up,
-            ffn_down,
-            ffn_gate,
-            norm_weight,
-        );
+        let params = TransformerBlockParams::builder(input)
+            .q_weight(q_weight)
+            .k_weight(k_weight)
+            .v_weight(v_weight)
+            .o_weight(o_weight)
+            .ffn_up(ffn_up)
+            .ffn_down(ffn_down)
+            .ffn_gate(ffn_gate)
+            .norm_weight(norm_weight)
+            .into_params();
         let result = inference.forward_block(params);
 
         assert!(result.is_ok());
@@ -392,17 +454,16 @@ mod tests {
         let input = vec![0.5; 256]; // Wrong size
         let weights = vec![0.1; 512 * 512];
 
-        let params = TransformerBlockParams::new(
-            input,
-            weights.clone(),
-            weights.clone(),
-            weights.clone(),
-            weights.clone(),
-            weights.clone(),
-            weights.clone(),
-            weights.clone(),
-            weights,
-        );
+        let params = TransformerBlockParams::builder(input)
+            .q_weight(weights.clone())
+            .k_weight(weights.clone())
+            .v_weight(weights.clone())
+            .o_weight(weights.clone())
+            .ffn_up(weights.clone())
+            .ffn_down(weights.clone())
+            .ffn_gate(weights.clone())
+            .norm_weight(weights)
+            .into_params();
         let result = inference.forward_block(params);
 
         assert!(result.is_err());

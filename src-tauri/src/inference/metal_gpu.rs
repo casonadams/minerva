@@ -188,6 +188,25 @@ impl Default for KernelConfig {
     }
 }
 
+/// Kernel buffer configuration
+#[derive(Debug, Clone)]
+pub struct KernelBuffers {
+    /// Input buffer IDs
+    pub input_buffers: Vec<usize>,
+    /// Output buffer ID
+    pub output_buffer: usize,
+}
+
+impl KernelBuffers {
+    /// Create new kernel buffers
+    pub fn new(input_buffers: Vec<usize>, output_buffer: usize) -> Self {
+        Self {
+            input_buffers,
+            output_buffer,
+        }
+    }
+}
+
 /// Kernel execution result
 #[derive(Debug, Clone)]
 pub struct KernelResult {
@@ -333,36 +352,35 @@ impl MetalDevice {
     pub fn execute_kernel(
         &self,
         config: KernelConfig,
-        input_buffers: &[usize],
-        output_buffer: usize,
+        buffers: KernelBuffers,
     ) -> MinervaResult<KernelResult> {
         let start = std::time::Instant::now();
 
         // Validate buffers exist
-        for &id in input_buffers {
+        for &id in &buffers.input_buffers {
             self.get_buffer(id)?;
         }
-        self.get_buffer(output_buffer)?;
+        self.get_buffer(buffers.output_buffer)?;
 
         // Simulate kernel execution
         match config.kernel {
             KernelType::MatMul => {
-                self.simulate_matmul(input_buffers, output_buffer)?;
+                self.simulate_matmul(&buffers.input_buffers, buffers.output_buffer)?;
             }
             KernelType::Attention => {
-                self.simulate_attention(input_buffers, output_buffer)?;
+                self.simulate_attention(&buffers.input_buffers, buffers.output_buffer)?;
             }
             KernelType::LayerNorm => {
-                self.simulate_layer_norm(input_buffers, output_buffer)?;
+                self.simulate_layer_norm(&buffers.input_buffers, buffers.output_buffer)?;
             }
             KernelType::SiLU => {
-                self.simulate_silu(input_buffers, output_buffer)?;
+                self.simulate_silu(&buffers.input_buffers, buffers.output_buffer)?;
             }
             KernelType::Softmax => {
-                self.simulate_softmax(input_buffers, output_buffer)?;
+                self.simulate_softmax(&buffers.input_buffers, buffers.output_buffer)?;
             }
             KernelType::ElementMul => {
-                self.simulate_element_mul(input_buffers, output_buffer)?;
+                self.simulate_element_mul(&buffers.input_buffers, buffers.output_buffer)?;
             }
         }
 
@@ -371,7 +389,7 @@ impl MetalDevice {
         Ok(KernelResult {
             kernel: config.kernel,
             execution_time_ms: elapsed.as_secs_f32() * 1000.0,
-            output_buffer_id: output_buffer,
+            output_buffer_id: buffers.output_buffer,
             error: None,
         })
     }
@@ -681,7 +699,9 @@ mod tests {
             kernel: KernelType::MatMul,
             ..Default::default()
         };
-        let result = device.execute_kernel(config, &[a, b], c).unwrap();
+        let result = device
+            .execute_kernel(config, KernelBuffers::new(vec![a, b], c))
+            .unwrap();
         assert_eq!(result.kernel, KernelType::MatMul);
         assert_eq!(result.output_buffer_id, c);
     }
@@ -698,7 +718,9 @@ mod tests {
             kernel: KernelType::Attention,
             ..Default::default()
         };
-        let result = device.execute_kernel(config, &[q, k, v], out).unwrap();
+        let result = device
+            .execute_kernel(config, KernelBuffers::new(vec![q, k, v], out))
+            .unwrap();
         assert_eq!(result.kernel, KernelType::Attention);
     }
 
@@ -713,7 +735,9 @@ mod tests {
             kernel: KernelType::LayerNorm,
             ..Default::default()
         };
-        let result = device.execute_kernel(config, &[x, weight], out).unwrap();
+        let result = device
+            .execute_kernel(config, KernelBuffers::new(vec![x, weight], out))
+            .unwrap();
         assert_eq!(result.kernel, KernelType::LayerNorm);
     }
 
@@ -727,7 +751,9 @@ mod tests {
             kernel: KernelType::MatMul,
             ..Default::default()
         };
-        assert!(device.execute_kernel(config, &[a], out).is_err());
+        assert!(device
+            .execute_kernel(config, KernelBuffers::new(vec![a], out))
+            .is_err());
     }
 
     #[test]
@@ -820,7 +846,9 @@ mod tests {
             kernel: KernelType::SiLU,
             ..Default::default()
         };
-        let result = device.execute_kernel(config, &[x], out).unwrap();
+        let result = device
+            .execute_kernel(config, KernelBuffers::new(vec![x], out))
+            .unwrap();
         assert_eq!(result.kernel, KernelType::SiLU);
     }
 
@@ -834,7 +862,9 @@ mod tests {
             kernel: KernelType::Softmax,
             ..Default::default()
         };
-        let result = device.execute_kernel(config, &[x], out).unwrap();
+        let result = device
+            .execute_kernel(config, KernelBuffers::new(vec![x], out))
+            .unwrap();
         assert_eq!(result.kernel, KernelType::Softmax);
     }
 
@@ -849,7 +879,9 @@ mod tests {
             kernel: KernelType::ElementMul,
             ..Default::default()
         };
-        let result = device.execute_kernel(config, &[a, b], out).unwrap();
+        let result = device
+            .execute_kernel(config, KernelBuffers::new(vec![a, b], out))
+            .unwrap();
         assert_eq!(result.kernel, KernelType::ElementMul);
     }
 }
