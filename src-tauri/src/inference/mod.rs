@@ -13,6 +13,7 @@ pub mod llama_adapter;
 pub mod llama_engine;
 pub mod llama_inference;
 pub mod llama_tokenizer;
+pub mod metal_gpu;
 pub mod metrics;
 pub mod model_cache;
 pub mod model_registry;
