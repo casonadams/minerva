@@ -1,4 +1,6 @@
 pub mod batch;
+pub mod batch_measurement;
+pub mod batch_optimized;
 pub mod benchmarks;
 pub mod cache_optimizer;
 pub mod context_manager;
