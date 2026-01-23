@@ -11,6 +11,7 @@ pub mod gpu_batch_scheduler;
 pub mod gpu_context;
 pub mod llama_adapter;
 pub mod llama_engine;
+pub mod llama_tokenizer;
 pub mod metrics;
 pub mod model_cache;
 pub mod model_registry;
