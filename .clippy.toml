@@ -1,0 +1,18 @@
+# Clippy configuration for Minerva
+# Enforces strict code quality standards as per engineering standards
+
+# Enforce maximum 3 arguments per function
+# Functions should have minimal dependencies (≤ 3 parameters)
+# Use objects/structs for more complex parameter passing
+too-many-arguments-threshold = 3
+
+# Cognitive complexity per function (default: 25)
+# Keep functions simple and understandable
+cognitive-complexity-threshold = 20
+
+# Type complexity threshold (avoid overly complex types)
+type-complexity-threshold = 250
+
+# Allow certain patterns for legitimate use cases in tests
+allow-expect-in-tests = true
+allow-unwrap-in-tests = true
