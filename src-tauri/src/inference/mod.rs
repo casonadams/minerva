@@ -12,6 +12,7 @@ pub mod gpu_compute_engine;
 pub mod gpu_context;
 pub mod gpu_llama_integration;
 pub mod inference_pipeline;
+pub mod kv_cache_optimizer;
 pub mod llama_adapter;
 pub mod llama_engine;
 pub mod llama_inference;
