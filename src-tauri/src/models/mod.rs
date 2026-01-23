@@ -1,4 +1,6 @@
+pub mod gguf_loader;
 pub mod gguf_parser;
+pub mod gguf_tensor;
 pub mod loader;
 
 use serde::{Deserialize, Serialize};
