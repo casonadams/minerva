@@ -1,18 +1,142 @@
-# Clippy configuration for Minerva
-# Enforces strict code quality standards as per engineering standards
+# Clippy configuration for Minerva - Phase 6
+# Enforces strict code quality standards per engineering_standards.md
+# Reference: https://rust-lang.github.io/rust-clippy/master/index.html
 
-# Enforce maximum 3 arguments per function
-# Functions should have minimal dependencies (≤ 3 parameters)
-# Use objects/structs for more complex parameter passing
+# =============================================================================
+# FUNCTION SIGNATURE RULES (Complexity ≤ 3)
+# =============================================================================
+
+# Maximum 3 arguments per function - enforces dependency injection pattern
+# Functions with more parameters should consolidate into objects/structs
+# Relates to: Single Responsibility, Dependency Injection, Testability
 too-many-arguments-threshold = 3
 
-# Cognitive complexity per function (default: 25)
-# Keep functions simple and understandable
+# =============================================================================
+# COMPLEXITY THRESHOLDS (Keep functions simple and understandable)
+# =============================================================================
+
+# Cognitive complexity per function (default: 25, we're stricter at 20)
+# Measures how hard a function is to understand
+# Lower = simpler = easier to test and maintain
 cognitive-complexity-threshold = 20
 
 # Type complexity threshold (avoid overly complex types)
+# Prevents type-level obfuscation and makes code more readable
 type-complexity-threshold = 250
 
-# Allow certain patterns for legitimate use cases in tests
+# =============================================================================
+# TEST CODE ALLOWANCES
+# =============================================================================
+
+# Allow expect() in test code without warnings
+# Tests need to panic on invalid conditions
 allow-expect-in-tests = true
+
+# Allow unwrap() in test code without warnings
+# Tests can be more lenient with error handling
 allow-unwrap-in-tests = true
+
+# =============================================================================
+# DOCUMENTATION REQUIREMENTS
+# =============================================================================
+
+# Require documentation for public items
+# Helps maintain clarity and enables IDE documentation features
+# Note: Also use `#![warn(missing_docs)]` in lib.rs for enforcement
+
+# =============================================================================
+# SIZE WARNINGS
+# =============================================================================
+
+# Maximum size of objects (in bytes) that's ok to stack allocate
+# Larger objects should use Box or other heap allocation
+# This prevents stack overflows with large local variables
+too-large-for-stack = 200
+
+# =============================================================================
+# NAMING CONVENTIONS
+# =============================================================================
+
+# Single char names are generally discouraged except in very limited contexts
+# (e.g., loop variables, mathematical operations, single-letter generics)
+# Higher threshold keeps linting focused on critical cases
+single-char-binding-names-threshold = 4
+
+# =============================================================================
+# ASYNC/AWAIT SAFETY
+# =============================================================================
+
+# Types that should not be held across await points
+# Includes non-async-aware synchronization primitives
+# Add to this list if you have custom types that shouldn't cross await boundaries
+await-holding-invalid-types = [
+    # Example: "std::sync::Mutex" would go here if not already detected
+]
+
+# =============================================================================
+# SAFETY & CORRECTNESS
+# =============================================================================
+
+# These lints are automatically enforced by Clippy's default deny rules:
+# - absurd_extreme_comparisons (comparing with type min/max)
+# - almost_swapped (failed swap patterns)
+# - async_yields_async (missing await)
+# - bad_bit_mask (impossible bit patterns)
+# - bool_comparison (comparing bool with literals)
+
+# =============================================================================
+# PERFORMANCE LINTS (warn by default, upgrade to deny in CI)
+# =============================================================================
+
+# These are automatically detected:
+# - borrowed_box (use &T instead of &Box<T>)
+# - box_collection (don't box collections)
+# - box_default (use Box::default())
+# - boxed_local (don't use Box for local variables)
+
+# =============================================================================
+# STYLE ENFORCEMENT
+# =============================================================================
+
+# Blocks in conditions make code hard to read
+# (if { true } { ... } should be if true { ... })
+
+# Assignments in conditions are error-prone
+# (if x = 5 { ... } likely meant if x == 5 { ... })
+
+# =============================================================================
+# ENGINEERING STANDARDS ALIGNMENT
+# =============================================================================
+
+# These settings align with the standards defined in docs/ENGINEERING_STANDARDS.md:
+#
+# Complexity (M ≤ 3):
+#   ✓ cognitive-complexity-threshold = 20 (reasonable bound)
+#   ✓ type-complexity-threshold = 250 (prevent obfuscation)
+#
+# Dependencies (≤ 2-3 parameters):
+#   ✓ too-many-arguments-threshold = 3 (enforces DI pattern)
+#
+# Function Size (≤ 25 lines):
+#   ✓ Enforced via review, not lint (use clippy-too-many-lines in future)
+#
+# File Size (≤ 100 lines):
+#   ✓ Enforced via review and organization
+#
+# Testing:
+#   ✓ allow-expect-in-tests = true (allows panic assertions)
+#   ✓ allow-unwrap-in-tests = true (allows test ergonomics)
+#
+# =============================================================================
+# USAGE
+# =============================================================================
+
+# This file is automatically read from the workspace root.
+# Run clippy normally:
+#   cargo clippy --all-targets
+#
+# Enforce specific lint:
+#   cargo clippy --all-targets -- -D clippy::too-many-arguments
+#
+# Check violations:
+#   See docs/CLIPPY_VIOLATIONS.md for current violations and fixes
