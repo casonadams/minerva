@@ -9,7 +9,7 @@
 
 mod integration;
 
-use minerva_lib::inference::llama_adapter::InferenceBackend;
+use minerva_lib::inference::llama_adapter::{GenerationParams, InferenceBackend};
 use std::fs;
 use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
@@ -231,7 +231,12 @@ fn test_mock_backend_generation() {
     let mut backend = MockBackend::new();
     assert!(backend.load_model(&model_path, 2048).is_ok());
 
-    let response = backend.generate("hello", 50, 0.7, 0.9).unwrap();
+    let params = GenerationParams {
+        max_tokens: 50,
+        temperature: 0.7,
+        top_p: 0.9,
+    };
+    let response = backend.generate("hello", params).unwrap();
     assert!(!response.is_empty());
 }
 
@@ -431,7 +436,12 @@ fn test_backend_with_streaming() {
     assert!(backend.load_model(&model_path, 2048).is_ok());
 
     let stream = TokenStream::new();
-    let response = backend.generate("hello", 100, 0.7, 0.9).unwrap();
+    let params = GenerationParams {
+        max_tokens: 100,
+        temperature: 0.7,
+        top_p: 0.9,
+    };
+    let response = backend.generate("hello", params).unwrap();
 
     // Stream the response
     for word in response.split_whitespace() {
@@ -520,7 +530,12 @@ fn test_streaming_with_inference_backend() {
     let stream = TokenStream::with_callback(callback);
 
     // Generate response
-    let response = backend.generate("test prompt", 50, 0.7, 0.9).unwrap();
+    let params = GenerationParams {
+        max_tokens: 50,
+        temperature: 0.7,
+        top_p: 0.9,
+    };
+    let response = backend.generate("test prompt", params).unwrap();
 
     // Stream the response with callbacks
     for word in response.split_whitespace() {
@@ -583,10 +598,16 @@ fn test_error_recovery_model_corrupted() {
 
 #[test]
 fn test_performance_metrics_tracking() {
-    use minerva_lib::inference::benchmarks::PerformanceMetrics;
+    use minerva_lib::inference::benchmarks::{PerformanceMetrics, PerformanceMetricsInput};
     use std::time::Duration;
 
-    let metrics = PerformanceMetrics::new(Duration::from_secs(1), 256, 2_000_000, true);
+    let input = PerformanceMetricsInput {
+        duration: Duration::from_secs(1),
+        token_count: 256,
+        memory_bytes: 2_000_000,
+        gpu_used: true,
+    };
+    let metrics = PerformanceMetrics::new(input);
 
     assert_eq!(metrics.token_count, 256);
     assert_eq!(metrics.tokens_per_sec, 256.0);
@@ -630,7 +651,12 @@ fn test_full_inference_with_error_handling() {
     assert!(backend.is_loaded());
 
     // Test successful generation
-    let result = backend.generate("test prompt", 100, 0.7, 0.9);
+    let params = GenerationParams {
+        max_tokens: 100,
+        temperature: 0.7,
+        top_p: 0.9,
+    };
+    let result = backend.generate("test prompt", params);
     assert!(result.is_ok());
 
     // Verify no recoverable errors

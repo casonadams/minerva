@@ -119,6 +119,19 @@ impl fmt::Display for GGUFDataType {
     }
 }
 
+/// Input for creating GGUF tensors
+#[derive(Clone)]
+pub struct GGUFTensorData {
+    /// Tensor name (e.g., "token_embd.weight")
+    pub name: String,
+    /// Data type of tensor
+    pub data_type: GGUFDataType,
+    /// Tensor shape (dimensions)
+    pub shape: Vec<u64>,
+    /// Raw tensor data
+    pub data: Vec<u8>,
+}
+
 /// GGUF tensor information and data
 #[derive(Clone)]
 pub struct GGUFTensor {
@@ -132,15 +145,21 @@ pub struct GGUFTensor {
     pub data: Vec<u8>,
 }
 
-impl GGUFTensor {
-    /// Create a new tensor
-    pub fn new(name: String, data_type: GGUFDataType, shape: Vec<u64>, data: Vec<u8>) -> Self {
+impl From<GGUFTensorData> for GGUFTensor {
+    fn from(input: GGUFTensorData) -> Self {
         Self {
-            name,
-            data_type,
-            shape,
-            data,
+            name: input.name,
+            data_type: input.data_type,
+            shape: input.shape,
+            data: input.data,
         }
+    }
+}
+
+impl GGUFTensor {
+    /// Create a new tensor from data
+    pub fn new(input: GGUFTensorData) -> Self {
+        Self::from(input)
     }
 
     /// Get total number of elements in tensor
@@ -226,12 +245,13 @@ mod tests {
 
     #[test]
     fn test_tensor_creation() {
-        let tensor = GGUFTensor::new(
-            "test.weight".to_string(),
-            GGUFDataType::F32,
-            vec![10, 20],
-            vec![0u8; 800],
-        );
+        let input = GGUFTensorData {
+            name: "test.weight".to_string(),
+            data_type: GGUFDataType::F32,
+            shape: vec![10, 20],
+            data: vec![0u8; 800],
+        };
+        let tensor = GGUFTensor::new(input);
 
         assert_eq!(tensor.name, "test.weight");
         assert_eq!(tensor.element_count(), 200);
@@ -241,24 +261,26 @@ mod tests {
 
     #[test]
     fn test_tensor_shape_string() {
-        let tensor = GGUFTensor::new(
-            "weight".to_string(),
-            GGUFDataType::F32,
-            vec![4096, 32000],
-            vec![0u8; 1],
-        );
+        let input = GGUFTensorData {
+            name: "weight".to_string(),
+            data_type: GGUFDataType::F32,
+            shape: vec![4096, 32000],
+            data: vec![0u8; 1],
+        };
+        let tensor = GGUFTensor::new(input);
 
         assert_eq!(tensor.shape_str(), "4096x32000");
     }
 
     #[test]
     fn test_tensor_invalid_size() {
-        let tensor = GGUFTensor::new(
-            "test.weight".to_string(),
-            GGUFDataType::F32,
-            vec![10, 20],
-            vec![0u8; 100], // Wrong size, should be 800
-        );
+        let input = GGUFTensorData {
+            name: "test.weight".to_string(),
+            data_type: GGUFDataType::F32,
+            shape: vec![10, 20],
+            data: vec![0u8; 100], // Wrong size, should be 800
+        };
+        let tensor = GGUFTensor::new(input);
 
         assert!(!tensor.is_valid());
         assert_eq!(tensor.total_bytes(), 100);

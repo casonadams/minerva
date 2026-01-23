@@ -24,6 +24,17 @@ use llama_cpp::{LlamaModel, LlamaParams, LlamaSession, SessionParams};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
+/// Parameters for text generation
+#[derive(Debug, Clone, Copy)]
+pub struct GenerationParams {
+    /// Maximum number of tokens to generate
+    pub max_tokens: usize,
+    /// Sampling temperature (0.0-2.0)
+    pub temperature: f32,
+    /// Top-p (nucleus) sampling parameter
+    pub top_p: f32,
+}
+
 /// Trait defining the inference backend interface
 ///
 /// This allows pluggable backends (mock, real llama.cpp, onnx, etc.)
@@ -36,13 +47,7 @@ pub trait InferenceBackend: Send + Sync {
     fn unload_model(&mut self);
 
     /// Generate text from prompt
-    fn generate(
-        &self,
-        prompt: &str,
-        max_tokens: usize,
-        temperature: f32,
-        top_p: f32,
-    ) -> MinervaResult<String>;
+    fn generate(&self, prompt: &str, params: GenerationParams) -> MinervaResult<String>;
 
     /// Tokenize text into token IDs
     fn tokenize(&self, text: &str) -> MinervaResult<Vec<i32>>;
@@ -144,13 +149,7 @@ impl InferenceBackend for LlamaCppBackend {
         tracing::info!("Model unloaded");
     }
 
-    fn generate(
-        &self,
-        prompt: &str,
-        max_tokens: usize,
-        _temperature: f32,
-        _top_p: f32,
-    ) -> MinervaResult<String> {
+    fn generate(&self, prompt: &str, params: GenerationParams) -> MinervaResult<String> {
         // Validate model and session exist
         let model = self.model.lock().unwrap();
         let mut session = self.session.lock().unwrap();
@@ -174,7 +173,7 @@ impl InferenceBackend for LlamaCppBackend {
         let mut generated_text = String::new();
 
         let completions = session
-            .start_completing_with(sampler, max_tokens)
+            .start_completing_with(sampler, params.max_tokens)
             .map_err(|e| MinervaError::InferenceError(format!("Generation failed: {:?}", e)))?
             .into_strings();
 
@@ -258,13 +257,7 @@ impl InferenceBackend for MockBackend {
         self.loaded = false;
     }
 
-    fn generate(
-        &self,
-        prompt: &str,
-        max_tokens: usize,
-        _temperature: f32,
-        _top_p: f32,
-    ) -> MinervaResult<String> {
+    fn generate(&self, prompt: &str, params: GenerationParams) -> MinervaResult<String> {
         if !self.loaded {
             return Err(MinervaError::InferenceError("Model not loaded".to_string()));
         }
@@ -272,7 +265,7 @@ impl InferenceBackend for MockBackend {
         // Simulate real inference
         std::thread::sleep(std::time::Duration::from_millis(50));
 
-        let response = self.generate_intelligent_response(prompt, max_tokens);
+        let response = self.generate_intelligent_response(prompt, params.max_tokens);
         Ok(response)
     }
 
@@ -392,7 +385,12 @@ mod tests {
         let mut backend = MockBackend::new();
         assert!(backend.load_model(&model_path, 2048).is_ok());
 
-        let result = backend.generate("hello", 100, 0.7, 0.9);
+        let params = GenerationParams {
+            max_tokens: 100,
+            temperature: 0.7,
+            top_p: 0.9,
+        };
+        let result = backend.generate("hello", params);
         assert!(result.is_ok());
         assert!(!result.unwrap().is_empty());
     }

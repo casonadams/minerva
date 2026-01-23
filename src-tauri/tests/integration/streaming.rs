@@ -1,6 +1,6 @@
 // Token Streaming and Backend Abstraction Integration Tests
 
-use minerva_lib::inference::llama_adapter::InferenceBackend;
+use minerva_lib::inference::llama_adapter::{GenerationParams, InferenceBackend};
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -107,7 +107,12 @@ fn test_mock_backend_generation() {
     assert!(backend.load_model(&model_path, 2048).is_ok());
     assert!(backend.is_loaded());
 
-    let result = backend.generate("test", 100, 0.7, 0.9);
+    let params = GenerationParams {
+        max_tokens: 100,
+        temperature: 0.7,
+        top_p: 0.9,
+    };
+    let result = backend.generate("test", params);
     assert!(result.is_ok());
 }
 
@@ -163,7 +168,12 @@ fn test_backend_with_streaming() {
 
     let _stream = TokenStream::with_callback(callback);
 
-    let result = backend.generate("prompt", 10, 0.7, 0.9);
+    let params = GenerationParams {
+        max_tokens: 10,
+        temperature: 0.7,
+        top_p: 0.9,
+    };
+    let result = backend.generate("prompt", params);
     assert!(result.is_ok());
     drop(_stream);
 }
@@ -180,7 +190,12 @@ fn test_streaming_with_inference_backend() {
     let collected = Arc::new(Mutex::new(String::new()));
     let collected_clone = collected.clone();
 
-    let result = backend.generate("test", 5, 0.7, 0.9).unwrap();
+    let params = GenerationParams {
+        max_tokens: 5,
+        temperature: 0.7,
+        top_p: 0.9,
+    };
+    let result = backend.generate("test", params).unwrap();
     assert!(!result.is_empty());
 
     collected_clone.lock().unwrap().push_str(&result);

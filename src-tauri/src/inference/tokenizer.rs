@@ -107,6 +107,17 @@ impl Default for Vocabulary {
     }
 }
 
+/// Merge operation for BPE tokenizer
+#[derive(Debug, Clone, Copy)]
+pub struct MergeOperation {
+    /// Left token ID
+    pub left_id: u32,
+    /// Right token ID
+    pub right_id: u32,
+    /// Result token ID
+    pub result_id: u32,
+}
+
 /// Byte Pair Encoding tokenizer with real BPE support
 #[derive(Debug, Clone)]
 pub struct BPETokenizer {
@@ -125,23 +136,24 @@ impl BPETokenizer {
     }
 
     /// Add merge operation (left_id, right_id → result_id)
-    pub fn add_merge(&mut self, left_id: u32, right_id: u32, result_id: u32) -> Result<(), String> {
+    pub fn add_merge(&mut self, merge: MergeOperation) -> Result<(), String> {
         // Validate that tokens exist
         let left = self
             .vocab
-            .get_token(left_id)
-            .ok_or_else(|| format!("Token ID not found: {}", left_id))?;
+            .get_token(merge.left_id)
+            .ok_or_else(|| format!("Token ID not found: {}", merge.left_id))?;
         let _right = self
             .vocab
-            .get_token(right_id)
-            .ok_or_else(|| format!("Token ID not found: {}", right_id))?;
+            .get_token(merge.right_id)
+            .ok_or_else(|| format!("Token ID not found: {}", merge.right_id))?;
 
         // Ensure left token exists to prove we can merge
         if left.is_empty() {
             return Err("Cannot merge empty token".to_string());
         }
 
-        self.merges.push((left_id, right_id, result_id));
+        self.merges
+            .push((merge.left_id, merge.right_id, merge.result_id));
         Ok(())
     }
 
@@ -544,7 +556,12 @@ mod tests {
         assert_eq!(tokenizer.merge_count(), 0);
 
         // Add a merge operation
-        assert!(tokenizer.add_merge(1, 2, 3).is_ok());
+        let merge = MergeOperation {
+            left_id: 1,
+            right_id: 2,
+            result_id: 3,
+        };
+        assert!(tokenizer.add_merge(merge).is_ok());
         assert_eq!(tokenizer.merge_count(), 1);
     }
 

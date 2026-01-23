@@ -1,5 +1,6 @@
 // Error Recovery and End-to-End Pipeline Integration Tests
 
+use minerva_lib::inference::llama_adapter::GenerationParams;
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -153,7 +154,12 @@ fn test_full_inference_with_error_handling() {
     assert!(backend.load_model(&model_path, 2048).is_ok());
     assert!(backend.is_loaded());
 
-    let result = backend.generate("test prompt", 100, 0.7, 0.9);
+    let params = GenerationParams {
+        max_tokens: 100,
+        temperature: 0.7,
+        top_p: 0.9,
+    };
+    let result = backend.generate("test prompt", params);
     assert!(result.is_ok());
 
     if let Err(err) = result {
@@ -163,10 +169,16 @@ fn test_full_inference_with_error_handling() {
 
 #[test]
 fn test_performance_metrics_tracking() {
-    use minerva_lib::inference::benchmarks::PerformanceMetrics;
+    use minerva_lib::inference::benchmarks::{PerformanceMetrics, PerformanceMetricsInput};
     use std::time::Duration;
 
-    let metrics = PerformanceMetrics::new(Duration::from_millis(150), 3, 1_000_000, true);
+    let input = PerformanceMetricsInput {
+        duration: Duration::from_millis(150),
+        token_count: 3,
+        memory_bytes: 1_000_000,
+        gpu_used: true,
+    };
+    let metrics = PerformanceMetrics::new(input);
 
     assert!(metrics.duration.as_millis() > 0);
     assert_eq!(metrics.token_count, 3);

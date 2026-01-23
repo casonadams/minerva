@@ -7,7 +7,7 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
-use super::gguf_tensor::{GGUFDataType, GGUFTensor};
+use super::gguf_tensor::{GGUFDataType, GGUFTensor, GGUFTensorData};
 
 /// Metadata about a loaded GGUF model
 #[derive(Debug, Clone)]
@@ -236,7 +236,13 @@ impl GGUFModelLoader {
         file.seek(SeekFrom::Start(current_pos))
             .map_err(|e| MinervaError::ModelLoadingError(format!("Failed to seek back: {}", e)))?;
 
-        Ok(GGUFTensor::new(name, data_type, shape, data))
+        let tensor_data = GGUFTensorData {
+            name,
+            data_type,
+            shape,
+            data,
+        };
+        Ok(GGUFTensor::new(tensor_data))
     }
 
     // ==================== Helper Functions ====================

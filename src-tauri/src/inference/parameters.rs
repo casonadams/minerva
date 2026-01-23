@@ -87,30 +87,33 @@ mod tests {
     use super::*;
     use crate::models::ChatMessage;
 
-    fn make_request(
-        temp: Option<f32>,
+    #[derive(Default)]
+    struct TestRequestParams {
+        temperature: Option<f32>,
         top_p: Option<f32>,
         max_tokens: Option<usize>,
-        freq_penalty: Option<f32>,
-    ) -> ChatCompletionRequest {
+        frequency_penalty: Option<f32>,
+    }
+
+    fn make_request(params: TestRequestParams) -> ChatCompletionRequest {
         ChatCompletionRequest {
             model: "test".to_string(),
             messages: vec![ChatMessage {
                 role: "user".to_string(),
                 content: "hello".to_string(),
             }],
-            temperature: temp,
-            max_tokens,
+            temperature: params.temperature,
+            max_tokens: params.max_tokens,
             stream: None,
-            top_p,
-            frequency_penalty: freq_penalty,
+            top_p: params.top_p,
+            frequency_penalty: params.frequency_penalty,
             presence_penalty: None,
         }
     }
 
     #[test]
     fn test_parameter_parser_defaults() {
-        let req = make_request(None, None, None, None);
+        let req = make_request(TestRequestParams::default());
         let config = ParameterParser::from_request(&req).unwrap();
 
         assert_eq!(config.temperature, 0.7);
@@ -120,7 +123,13 @@ mod tests {
 
     #[test]
     fn test_parameter_parser_custom_values() {
-        let req = make_request(Some(0.5), Some(0.8), Some(1024), None);
+        let params = TestRequestParams {
+            temperature: Some(0.5),
+            top_p: Some(0.8),
+            max_tokens: Some(1024),
+            frequency_penalty: None,
+        };
+        let req = make_request(params);
         let config = ParameterParser::from_request(&req).unwrap();
 
         assert_eq!(config.temperature, 0.5);
@@ -130,21 +139,27 @@ mod tests {
 
     #[test]
     fn test_parameter_parser_invalid_temperature() {
-        let req = make_request(Some(3.0), None, None, None);
+        let params = TestRequestParams {
+            temperature: Some(3.0),
+            ..Default::default()
+        };
+        let req = make_request(params);
         let result = ParameterParser::from_request(&req);
 
         assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("temperature must be between")
-        );
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("temperature must be between"));
     }
 
     #[test]
     fn test_parameter_parser_invalid_top_p() {
-        let req = make_request(None, Some(1.5), None, None);
+        let params = TestRequestParams {
+            top_p: Some(1.5),
+            ..Default::default()
+        };
+        let req = make_request(params);
         let result = ParameterParser::from_request(&req);
 
         assert!(result.is_err());
@@ -153,21 +168,27 @@ mod tests {
 
     #[test]
     fn test_parameter_parser_invalid_max_tokens() {
-        let req = make_request(None, None, Some(0), None);
+        let params = TestRequestParams {
+            max_tokens: Some(0),
+            ..Default::default()
+        };
+        let req = make_request(params);
         let result = ParameterParser::from_request(&req);
 
         assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("max_tokens must be")
-        );
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("max_tokens must be"));
     }
 
     #[test]
     fn test_parameter_parser_frequency_penalty() {
-        let req = make_request(None, None, None, Some(0.0));
+        let params = TestRequestParams {
+            frequency_penalty: Some(0.0),
+            ..Default::default()
+        };
+        let req = make_request(params);
         let config = ParameterParser::from_request(&req).unwrap();
 
         // frequency_penalty 0.0 maps to repeat_penalty 1.0
@@ -176,7 +197,11 @@ mod tests {
 
     #[test]
     fn test_parameter_parser_frequency_penalty_positive() {
-        let req = make_request(None, None, None, Some(1.0));
+        let params = TestRequestParams {
+            frequency_penalty: Some(1.0),
+            ..Default::default()
+        };
+        let req = make_request(params);
         let config = ParameterParser::from_request(&req).unwrap();
 
         // frequency_penalty 1.0 maps to repeat_penalty ~1.1
@@ -185,21 +210,28 @@ mod tests {
 
     #[test]
     fn test_parameter_parser_invalid_frequency_penalty() {
-        let req = make_request(None, None, None, Some(3.0));
+        let params = TestRequestParams {
+            frequency_penalty: Some(3.0),
+            ..Default::default()
+        };
+        let req = make_request(params);
         let result = ParameterParser::from_request(&req);
 
         assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("frequency_penalty")
-        );
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("frequency_penalty"));
     }
 
     #[test]
     fn test_parameter_parser_summarize() {
-        let req = make_request(Some(0.8), None, Some(2048), None);
+        let params = TestRequestParams {
+            temperature: Some(0.8),
+            max_tokens: Some(2048),
+            ..Default::default()
+        };
+        let req = make_request(params);
         let summary = ParameterParser::summarize_request(&req);
 
         assert!(summary.contains("model=test"));
@@ -210,7 +242,7 @@ mod tests {
 
     #[test]
     fn test_parameter_parser_summarize_streaming() {
-        let mut req = make_request(None, None, None, None);
+        let mut req = make_request(TestRequestParams::default());
         req.stream = Some(true);
         let summary = ParameterParser::summarize_request(&req);
 

@@ -1,3 +1,13 @@
+/// Input for creating inference metrics
+#[derive(Debug, Clone)]
+pub struct InferenceMetricsInput {
+    pub request_id: String,
+    pub model_name: String,
+    pub prompt_tokens: usize,
+    pub completion_tokens: usize,
+    pub model_load_time_ms: u128,
+}
+
 /// Performance metrics for inference operations
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -15,23 +25,17 @@ pub struct InferenceMetrics {
 impl InferenceMetrics {
     /// Create new metrics
     #[allow(dead_code)]
-    pub fn new(
-        request_id: String,
-        model_name: String,
-        prompt_tokens: usize,
-        completion_tokens: usize,
-        model_load_time_ms: u128,
-    ) -> Self {
-        let total_tokens = prompt_tokens + completion_tokens;
+    pub fn new(input: InferenceMetricsInput) -> Self {
+        let total_tokens = input.prompt_tokens + input.completion_tokens;
 
         Self {
-            request_id,
-            model_name,
-            prompt_tokens,
-            completion_tokens,
+            request_id: input.request_id,
+            model_name: input.model_name,
+            prompt_tokens: input.prompt_tokens,
+            completion_tokens: input.completion_tokens,
             total_tokens,
             total_time_ms: 0,
-            model_load_time_ms,
+            model_load_time_ms: input.model_load_time_ms,
             generation_time_ms: 0,
         }
     }
@@ -76,8 +80,14 @@ mod tests {
 
     #[test]
     fn test_metrics_creation() {
-        let metrics =
-            InferenceMetrics::new("req-1".to_string(), "test-model".to_string(), 10, 20, 100);
+        let input = InferenceMetricsInput {
+            request_id: "req-1".to_string(),
+            model_name: "test-model".to_string(),
+            prompt_tokens: 10,
+            completion_tokens: 20,
+            model_load_time_ms: 100,
+        };
+        let metrics = InferenceMetrics::new(input);
 
         assert_eq!(metrics.request_id, "req-1");
         assert_eq!(metrics.model_name, "test-model");
@@ -88,8 +98,14 @@ mod tests {
 
     #[test]
     fn test_tokens_per_second_calculation() {
-        let mut metrics =
-            InferenceMetrics::new("req-1".to_string(), "test-model".to_string(), 10, 100, 100);
+        let input = InferenceMetricsInput {
+            request_id: "req-1".to_string(),
+            model_name: "test-model".to_string(),
+            prompt_tokens: 10,
+            completion_tokens: 100,
+            model_load_time_ms: 100,
+        };
+        let mut metrics = InferenceMetrics::new(input);
         metrics.generation_time_ms = 1000;
 
         let tps = metrics.tokens_per_second();
@@ -98,15 +114,27 @@ mod tests {
 
     #[test]
     fn test_tokens_per_second_zero_time() {
-        let metrics =
-            InferenceMetrics::new("req-1".to_string(), "test-model".to_string(), 10, 100, 100);
+        let input = InferenceMetricsInput {
+            request_id: "req-1".to_string(),
+            model_name: "test-model".to_string(),
+            prompt_tokens: 10,
+            completion_tokens: 100,
+            model_load_time_ms: 100,
+        };
+        let metrics = InferenceMetrics::new(input);
         assert_eq!(metrics.tokens_per_second(), 0.0);
     }
 
     #[test]
     fn test_metrics_summary() {
-        let mut metrics =
-            InferenceMetrics::new("req-1".to_string(), "test-model".to_string(), 10, 100, 50);
+        let input = InferenceMetricsInput {
+            request_id: "req-1".to_string(),
+            model_name: "test-model".to_string(),
+            prompt_tokens: 10,
+            completion_tokens: 100,
+            model_load_time_ms: 50,
+        };
+        let mut metrics = InferenceMetrics::new(input);
         metrics.generation_time_ms = 500;
 
         let summary = metrics.summary();

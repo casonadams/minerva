@@ -8,6 +8,19 @@
 use crate::error::MinervaResult;
 use std::time::{Duration, Instant};
 
+/// Input for creating performance metrics
+#[derive(Debug, Clone)]
+pub struct PerformanceMetricsInput {
+    /// Total generation time
+    pub duration: Duration,
+    /// Number of tokens generated
+    pub token_count: usize,
+    /// Memory used in bytes
+    pub memory_bytes: usize,
+    /// Was GPU used
+    pub gpu_used: bool,
+}
+
 /// Performance metrics for inference
 #[derive(Debug, Clone)]
 pub struct PerformanceMetrics {
@@ -25,25 +38,20 @@ pub struct PerformanceMetrics {
 
 impl PerformanceMetrics {
     /// Create metrics from measurements
-    pub fn new(
-        duration: Duration,
-        token_count: usize,
-        memory_bytes: usize,
-        gpu_used: bool,
-    ) -> Self {
-        let total_secs = duration.as_secs_f32();
+    pub fn new(input: PerformanceMetricsInput) -> Self {
+        let total_secs = input.duration.as_secs_f32();
         let tokens_per_sec = if total_secs > 0.0 {
-            token_count as f32 / total_secs
+            input.token_count as f32 / total_secs
         } else {
             0.0
         };
 
         Self {
-            duration,
-            token_count,
+            duration: input.duration,
+            token_count: input.token_count,
             tokens_per_sec,
-            memory_bytes,
-            gpu_used,
+            memory_bytes: input.memory_bytes,
+            gpu_used: input.gpu_used,
         }
     }
 
@@ -207,7 +215,13 @@ mod tests {
 
     #[test]
     fn test_performance_metrics() {
-        let metrics = PerformanceMetrics::new(Duration::from_secs(1), 100, 1_000_000, true);
+        let input = PerformanceMetricsInput {
+            duration: Duration::from_secs(1),
+            token_count: 100,
+            memory_bytes: 1_000_000,
+            gpu_used: true,
+        };
+        let metrics = PerformanceMetrics::new(input);
         assert_eq!(metrics.token_count, 100);
         assert_eq!(metrics.tokens_per_sec, 100.0);
         assert!(metrics.summary().contains("100"));
@@ -215,7 +229,13 @@ mod tests {
 
     #[test]
     fn test_performance_metrics_zero_duration() {
-        let metrics = PerformanceMetrics::new(Duration::from_millis(1), 1000, 1_000_000, false);
+        let input = PerformanceMetricsInput {
+            duration: Duration::from_millis(1),
+            token_count: 1000,
+            memory_bytes: 1_000_000,
+            gpu_used: false,
+        };
+        let metrics = PerformanceMetrics::new(input);
         assert!(metrics.tokens_per_sec > 0.0);
     }
 

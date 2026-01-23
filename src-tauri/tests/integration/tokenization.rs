@@ -1,7 +1,7 @@
 // Real Tokenization and Vocabulary Integration Tests (Phase 4 Step 4)
 
 use minerva_lib::inference::tokenizer::{
-    BPETokenizer, FormatDetection, Token, TokenHandler, TokenizerFormat, Vocabulary,
+    BPETokenizer, FormatDetection, MergeOperation, Token, TokenHandler, TokenizerFormat, Vocabulary,
 };
 
 // Vocabulary Tests
@@ -377,7 +377,12 @@ fn test_bpe_add_merge_valid() {
     vocab.add_token("he".to_string(), 3).unwrap();
 
     let mut tokenizer = BPETokenizer::new(vocab);
-    assert!(tokenizer.add_merge(1, 2, 3).is_ok());
+    let merge = MergeOperation {
+        left_id: 1,
+        right_id: 2,
+        result_id: 3,
+    };
+    assert!(tokenizer.add_merge(merge).is_ok());
     assert_eq!(tokenizer.merge_count(), 1);
 }
 
@@ -386,7 +391,12 @@ fn test_bpe_add_merge_invalid_left() {
     let vocab = Vocabulary::new();
     let mut tokenizer = BPETokenizer::new(vocab);
 
-    let result = tokenizer.add_merge(999, 2, 3);
+    let merge = MergeOperation {
+        left_id: 999,
+        right_id: 2,
+        result_id: 3,
+    };
+    let result = tokenizer.add_merge(merge);
     assert!(result.is_err());
 }
 
@@ -396,7 +406,12 @@ fn test_bpe_add_merge_invalid_right() {
     vocab.add_token("h".to_string(), 1).unwrap();
 
     let mut tokenizer = BPETokenizer::new(vocab);
-    let result = tokenizer.add_merge(1, 999, 3);
+    let merge = MergeOperation {
+        left_id: 1,
+        right_id: 999,
+        result_id: 3,
+    };
+    let result = tokenizer.add_merge(merge);
     assert!(result.is_err());
 }
 
@@ -412,10 +427,20 @@ fn test_bpe_merge_count() {
     let mut tokenizer = BPETokenizer::new(vocab);
     assert_eq!(tokenizer.merge_count(), 0);
 
-    tokenizer.add_merge(1, 2, 4).ok();
+    let merge1 = MergeOperation {
+        left_id: 1,
+        right_id: 2,
+        result_id: 4,
+    };
+    tokenizer.add_merge(merge1).ok();
     assert_eq!(tokenizer.merge_count(), 1);
 
-    tokenizer.add_merge(4, 3, 5).ok();
+    let merge2 = MergeOperation {
+        left_id: 4,
+        right_id: 3,
+        result_id: 5,
+    };
+    tokenizer.add_merge(merge2).ok();
     assert_eq!(tokenizer.merge_count(), 2);
 }
 
@@ -430,7 +455,12 @@ fn test_real_bpe_pipeline() {
     vocab.add_token("o".to_string(), 4).unwrap();
 
     let mut tokenizer = BPETokenizer::new(vocab);
-    tokenizer.add_merge(1, 2, 5).ok();
+    let merge = MergeOperation {
+        left_id: 1,
+        right_id: 2,
+        result_id: 5,
+    };
+    tokenizer.add_merge(merge).ok();
 
     let tokens = tokenizer.encode("hello");
     assert!(!tokens.is_empty());
@@ -444,7 +474,12 @@ fn test_vocabulary_with_tokenizer_and_merges() {
     vocab.add_token("c".to_string(), 3).unwrap();
 
     let mut tokenizer = BPETokenizer::new(vocab);
-    tokenizer.add_merge(1, 2, 4).ok();
+    let merge = MergeOperation {
+        left_id: 1,
+        right_id: 2,
+        result_id: 4,
+    };
+    tokenizer.add_merge(merge).ok();
 
     assert_eq!(tokenizer.merge_count(), 1);
     let tokens = tokenizer.encode("abc");
