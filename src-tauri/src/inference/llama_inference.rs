@@ -218,6 +218,18 @@ pub struct AttentionOutput {
     pub weights: Option<Vec<f32>>,
 }
 
+/// Parameters for MultiHeadAttention forward pass
+pub struct AttentionParams<'a> {
+    /// Query data (mutable)
+    pub query: &'a mut [f32],
+    /// Key data (mutable)
+    pub key: &'a mut [f32],
+    /// Value data
+    pub value: &'a [f32],
+    /// Position in sequence
+    pub pos: usize,
+}
+
 /// Compute softmax on values
 fn softmax(values: &mut [f32]) {
     let max = values.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
@@ -327,32 +339,26 @@ impl MultiHeadAttention {
     }
 
     /// Forward pass for attention
-    pub fn forward(
-        &self,
-        query: &mut [f32],
-        key: &mut [f32],
-        value: &[f32],
-        pos: usize,
-    ) -> MinervaResult<AttentionOutput> {
-        if query.len() != key.len() {
+    pub fn forward(&self, params: AttentionParams) -> MinervaResult<AttentionOutput> {
+        if params.query.len() != params.key.len() {
             return Err(MinervaError::InferenceError(
                 "Query and key dimensions must match".to_string(),
             ));
         }
 
         // Apply rotary embeddings
-        self.apply_rope(query, key, pos);
+        self.apply_rope(params.query, params.key, params.pos);
 
         // Compute attention scores
         let scale = (self.head_dim as f32).sqrt().recip();
-        let mut scores = self.compute_scores(query, key, scale);
+        let mut scores = self.compute_scores(params.query, params.key, scale);
 
         // Apply softmax
         softmax(&mut scores);
 
         // Compute output
-        let mut output = vec![0.0; query.len()];
-        let num_values = value.len() / (self.num_heads * self.head_dim);
+        let mut output = vec![0.0; params.query.len()];
+        let num_values = params.value.len() / (self.num_heads * self.head_dim);
 
         for h in 0..self.num_heads {
             for d in 0..self.head_dim {
@@ -361,8 +367,8 @@ impl MultiHeadAttention {
                     if v_pos < num_values {
                         let v_idx =
                             v_pos * (self.num_heads * self.head_dim) + h * self.head_dim + d;
-                        if v_idx < value.len() {
-                            sum += score_weight * value[v_idx];
+                        if v_idx < params.value.len() {
+                            sum += score_weight * params.value[v_idx];
                         }
                     }
                 }
@@ -375,6 +381,16 @@ impl MultiHeadAttention {
             weights: Some(scores),
         })
     }
+}
+
+/// Parameters for FeedForward forward pass
+pub struct FFParams<'a> {
+    /// Input data
+    pub x: &'a [f32],
+    /// Up weight
+    pub up_weight: &'a [f32],
+    /// Down weight
+    pub down_weight: &'a [f32],
 }
 
 /// Feed-forward network
@@ -393,21 +409,16 @@ impl FeedForward {
     }
 
     /// Forward pass: hidden -> up -> activate -> down -> hidden
-    pub fn forward(
-        &self,
-        x: &[f32],
-        up_weight: &[f32],
-        down_weight: &[f32],
-    ) -> MinervaResult<Vec<f32>> {
-        if x.len() != self.hidden_size {
+    pub fn forward(&self, params: FFParams) -> MinervaResult<Vec<f32>> {
+        if params.x.len() != self.hidden_size {
             return Err(MinervaError::InferenceError(format!(
                 "Input size {} != hidden size {}",
-                x.len(),
+                params.x.len(),
                 self.hidden_size
             )));
         }
 
-        if up_weight.len() != self.hidden_size * self.intermediate_size {
+        if params.up_weight.len() != self.hidden_size * self.intermediate_size {
             return Err(MinervaError::InferenceError(
                 "Up weight dimension mismatch".to_string(),
             ));
@@ -417,7 +428,7 @@ impl FeedForward {
         let mut hidden = vec![0.0; self.intermediate_size];
         for i in 0..self.intermediate_size {
             for j in 0..self.hidden_size {
-                hidden[i] += x[j] * up_weight[i * self.hidden_size + j];
+                hidden[i] += params.x[j] * params.up_weight[i * self.hidden_size + j];
             }
         }
 
@@ -426,10 +437,10 @@ impl FeedForward {
 
         // Down projection: hidden @ down_weight
         let mut output = vec![0.0; self.hidden_size];
-        if down_weight.len() == self.intermediate_size * self.hidden_size {
+        if params.down_weight.len() == self.intermediate_size * self.hidden_size {
             for i in 0..self.hidden_size {
                 for j in 0..self.intermediate_size {
-                    output[i] += hidden[j] * down_weight[j * self.hidden_size + i];
+                    output[i] += hidden[j] * params.down_weight[j * self.hidden_size + i];
                 }
             }
         }
@@ -727,7 +738,13 @@ mod tests {
         let up_w = vec![0.1; 32];
         let down_w = vec![0.1; 32];
 
-        let result = ff.forward(&x, &up_w, &down_w).unwrap();
+        let result = ff
+            .forward(FFParams {
+                x: &x,
+                up_weight: &up_w,
+                down_weight: &down_w,
+            })
+            .unwrap();
         assert_eq!(result.len(), 4);
     }
 
@@ -900,7 +917,11 @@ mod tests {
         let up_w = vec![0.1; 32];
         let down_w = vec![0.1; 32];
 
-        let result = ff.forward(&x, &up_w, &down_w);
+        let result = ff.forward(FFParams {
+            x: &x,
+            up_weight: &up_w,
+            down_weight: &down_w,
+        });
         assert!(result.is_err());
     }
 }
