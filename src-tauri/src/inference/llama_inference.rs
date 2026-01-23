@@ -47,6 +47,26 @@ pub struct KVCacheConfig {
     pub head_dim: usize,
 }
 
+/// Parameters for KV cache store operation
+#[derive(Debug, Clone)]
+pub struct KVStoreParams {
+    /// Layer index
+    pub layer: usize,
+    /// Position index
+    pub pos: usize,
+    /// Key data
+    pub k: Vec<f32>,
+    /// Value data
+    pub v: Vec<f32>,
+}
+
+impl KVStoreParams {
+    /// Create new KV store params
+    pub fn new(layer: usize, pos: usize, k: Vec<f32>, v: Vec<f32>) -> Self {
+        Self { layer, pos, k, v }
+    }
+}
+
 /// KV Cache for efficient inference
 #[derive(Debug, Clone)]
 pub struct KVCache {
@@ -75,31 +95,30 @@ impl KVCache {
     }
 
     /// Store key and value for a position
-    pub fn store(&mut self, layer: usize, pos: usize, kv: (&[f32], &[f32])) -> MinervaResult<()> {
-        let (k, v) = kv;
-        if layer >= self.keys.len() {
+    pub fn store(&mut self, params: KVStoreParams) -> MinervaResult<()> {
+        if params.layer >= self.keys.len() {
             return Err(MinervaError::InferenceError(format!(
                 "Layer index {} out of bounds",
-                layer
+                params.layer
             )));
         }
-        if pos >= self.keys[layer].len() {
+        if params.pos >= self.keys[params.layer].len() {
             return Err(MinervaError::InferenceError(format!(
                 "Position {} out of bounds",
-                pos
+                params.pos
             )));
         }
 
         // Flatten head dimension
-        let num_heads = self.keys[layer][pos].len();
-        let head_dim = self.keys[layer][pos][0].len();
+        let num_heads = self.keys[params.layer][params.pos].len();
+        let head_dim = self.keys[params.layer][params.pos][0].len();
 
         for h in 0..num_heads {
             let start = h * head_dim;
             let end = start + head_dim;
-            if start < k.len() && end <= k.len() {
-                self.keys[layer][pos][h].copy_from_slice(&k[start..end]);
-                self.values[layer][pos][h].copy_from_slice(&v[start..end]);
+            if start < params.k.len() && end <= params.k.len() {
+                self.keys[params.layer][params.pos][h].copy_from_slice(&params.k[start..end]);
+                self.values[params.layer][params.pos][h].copy_from_slice(&params.v[start..end]);
             }
         }
 
@@ -618,7 +637,8 @@ mod tests {
         let k = vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
         let v = vec![0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
 
-        assert!(cache.store(0, 0, (&k, &v)).is_ok());
+        let params = KVStoreParams::new(0, 0, k, v);
+        assert!(cache.store(params).is_ok());
         let (k_retrieved, v_retrieved) = cache.get(0, 0).unwrap();
         assert_eq!(k_retrieved.len(), 8);
         assert_eq!(v_retrieved.len(), 8);
@@ -803,7 +823,8 @@ mod tests {
         let mut cache = KVCache::new(config);
         let k = vec![0.5; 128];
         let v = vec![0.5; 128];
-        cache.store(0, 0, (&k, &v)).unwrap();
+        let params = KVStoreParams::new(0, 0, k, v);
+        cache.store(params).unwrap();
 
         cache.clear();
         let (k_cleared, v_cleared) = cache.get(0, 0).unwrap();
