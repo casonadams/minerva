@@ -6,7 +6,6 @@ use axum::{
     routing::{delete, get, post},
 };
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
@@ -17,6 +16,10 @@ use crate::error::{MinervaError, MinervaResult};
 use crate::models::{
     ChatCompletionRequest, ChatCompletionResponse, ChatMessage, Choice, ModelInfo, ModelRegistry,
     ModelsListResponse, Usage,
+};
+use crate::observability::{
+    endpoints::{HealthEndpointResponse, ReadinessResponse, MetricsResponse, RequestMetrics, ResponseTimeMetrics, ErrorMetrics, CacheMetrics},
+    metrics::MetricsCollector,
 };
 
 pub type SharedModelRegistry = Arc<Mutex<ModelRegistry>>;
@@ -51,6 +54,7 @@ pub struct ModelStatsResponse {
 #[allow(dead_code)]
 pub struct ServerState {
     pub model_registry: SharedModelRegistry,
+    pub metrics: Arc<MetricsCollector>,
 }
 
 impl ServerState {
@@ -58,6 +62,7 @@ impl ServerState {
     pub fn new() -> Self {
         Self {
             model_registry: Arc::new(Mutex::new(ModelRegistry::new())),
+            metrics: Arc::new(MetricsCollector::new()),
         }
     }
 }
@@ -77,6 +82,7 @@ impl ServerState {
 
         Ok(Self {
             model_registry: Arc::new(Mutex::new(registry)),
+            metrics: Arc::new(MetricsCollector::new()),
         })
     }
 }
@@ -89,17 +95,68 @@ pub async fn create_server(state: ServerState) -> Router {
         .route("/v1/models/:id/preload", post(preload_model))
         .route("/v1/models/:id", delete(unload_model))
         .route("/v1/chat/completions", post(chat_completions))
-        .route("/health", get(health_check))
+        .route("/health", get(health_check_enhanced))
+        .route("/ready", get(readiness_check))
+        .route("/metrics", get(metrics_endpoint))
         .route("/v1/models/stats", get(model_stats))
         .with_state(state)
         .layer(CorsLayer::permissive())
 }
 
-async fn health_check() -> impl IntoResponse {
-    Json(json!({
-        "status": "ok",
-        "timestamp": chrono::Utc::now().to_rfc3339()
-    }))
+/// Enhanced health check endpoint
+async fn health_check_enhanced() -> impl IntoResponse {
+    let mut resp = HealthEndpointResponse {
+        timestamp: chrono::Local::now().to_rfc3339(),
+        ..Default::default()
+    };
+    resp.calculate_status();
+    Json(resp)
+}
+
+/// Readiness probe endpoint
+async fn readiness_check() -> impl IntoResponse {
+    let resp = ReadinessResponse::ready();
+    Json(resp)
+}
+
+/// Metrics endpoint
+async fn metrics_endpoint(State(state): State<ServerState>) -> impl IntoResponse {
+    let metrics = state.metrics.snapshot();
+    let uptime = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    let resp = MetricsResponse {
+        timestamp: chrono::Local::now().to_rfc3339(),
+        uptime_seconds: uptime,
+        requests: RequestMetrics {
+            total: metrics.total_requests,
+            successful: metrics.successful_requests,
+            failed: metrics.failed_requests,
+            rps: metrics.rps,
+        },
+        response_times: ResponseTimeMetrics {
+            avg_ms: metrics.avg_response_time_ms,
+            min_ms: metrics.min_response_time_ms,
+            max_ms: metrics.max_response_time_ms,
+            p50_ms: metrics.p50_response_time_ms,
+            p95_ms: metrics.p95_response_time_ms,
+            p99_ms: metrics.p99_response_time_ms,
+        },
+        errors: ErrorMetrics {
+            total: metrics.failed_requests,
+            rate_percent: metrics.error_rate_percent,
+            top_error: None,
+        },
+        cache: CacheMetrics {
+            hits: metrics.cache_hits,
+            misses: metrics.cache_misses,
+            hit_rate_percent: metrics.cache_hit_rate_percent,
+        },
+    };
+
+    Json(resp)
 }
 
 async fn list_models(State(state): State<ServerState>) -> MinervaResult<Json<ModelsListResponse>> {
