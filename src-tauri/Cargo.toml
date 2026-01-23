@@ -44,6 +44,9 @@ futures = "0.3"
 parking_lot = "0.12"
 num_cpus = "1.16"
 libc = "0.2"
+rayon = "1.7"
+async-trait = "0.1"
+dashmap = "5.5"
 
 [[bench]]
 name = "batch_processing_benchmarks"
