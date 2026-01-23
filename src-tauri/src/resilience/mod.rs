@@ -10,6 +10,7 @@ pub mod circuit_breaker;
 pub mod fallback;
 pub mod health;
 pub mod retry;
+pub mod timeout;
 
 use crate::error::MinervaError;
 use std::time::Duration;
