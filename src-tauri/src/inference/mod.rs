@@ -1,3 +1,4 @@
+pub mod backend_manager;
 pub mod backend_selector;
 pub mod batch;
 pub mod batch_async;
