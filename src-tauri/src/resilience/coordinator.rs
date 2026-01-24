@@ -1,30 +1,8 @@
 use super::{
     circuit_breaker::CircuitBreaker, fallback::FallbackDecision, retry::RetryState,
-    timeout::TimeoutContext, ErrorClass,
+    timeout::TimeoutContext, ErrorClass, resilience_decision::ResilienceDecision,
 };
-/// Resilience Coordinator
-///
-/// Orchestrates all resilience patterns:
-/// - Error classification → strategy selection
-/// - Retry → Circuit breaker → Fallback coordination
-/// - Timeout integration
-/// - Health-based decision making
 use crate::error::MinervaError;
-
-/// Resilience decision for an operation
-#[derive(Debug, Clone)]
-pub struct ResilienceDecision {
-    /// Error classification
-    pub error_class: ErrorClass,
-    /// Should retry?
-    pub should_retry: bool,
-    /// Should fallback?
-    pub should_fallback: bool,
-    /// Should fail fast?
-    pub should_fail_fast: bool,
-    /// Time to wait before retry
-    pub retry_delay_ms: Option<u64>,
-}
 
 /// Resilience coordinator for orchestrating patterns
 pub struct ResilienceCoordinator {
@@ -129,7 +107,7 @@ impl ResilienceCoordinator {
         self.circuit_breaker.state()
     }
 
-    /// Check timeout
+    /// Is timed out?
     pub fn is_timed_out(&self) -> bool {
         if let Some(ref ctx) = self.timeout_context {
             ctx.is_deadline_exceeded()
