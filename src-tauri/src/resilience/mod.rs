@@ -8,6 +8,8 @@
 /// - Timeout management and deadline propagation
 pub mod circuit_breaker;
 pub mod circuit_breaker_config;
+pub mod circuit_breaker_request_handler;
+pub mod circuit_breaker_state_recorder;
 pub mod circuit_breaker_transitions;
 pub mod circuit_state_transitions;
 pub mod component_health;

@@ -1,6 +1,7 @@
 use super::circuit_breaker_config::CircuitBreakerConfig;
+use super::circuit_breaker_request_handler::CircuitBreakerRequestHandler;
+use super::circuit_breaker_state_recorder::CircuitBreakerStateRecorder;
 use super::circuit_state_transitions::StateTransitionHelper;
-use std::time::Duration;
 
 /// Circuit breaker states
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,57 +40,21 @@ impl CircuitBreakerStateMachine {
 
     /// Check if operation is allowed
     pub fn allow_request(&self) -> bool {
-        match self.state() {
-            CircuitState::Closed => true,
-            CircuitState::Open => {
-                if let Ok(elapsed) = self.transitions.time_since_open() {
-                    if elapsed >= Duration::from_secs(self.config.timeout_secs) {
-                        self.transitions.transition_to_half_open();
-                        true
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            }
-            CircuitState::HalfOpen => {
-                let successes = self.transitions.get_successes();
-                successes < self.config.half_open_max_calls
-            }
-        }
+        CircuitBreakerRequestHandler::should_allow_request(
+            self.state(),
+            &self.transitions,
+            &self.config,
+        )
     }
 
     /// Record successful operation
     pub fn record_success(&self) {
-        match self.state() {
-            CircuitState::Closed => {
-                self.transitions.reset_failures();
-            }
-            CircuitState::HalfOpen => {
-                let successes = self.transitions.increment_successes();
-                if successes >= self.config.half_open_max_calls {
-                    self.transitions.transition_to_closed();
-                }
-            }
-            _ => {}
-        }
+        CircuitBreakerStateRecorder::record_success(self.state(), &self.transitions, &self.config);
     }
 
     /// Record failed operation
     pub fn record_failure(&self) {
-        match self.state() {
-            CircuitState::Closed => {
-                let failures = self.transitions.increment_failures();
-                if failures >= self.config.failure_threshold {
-                    self.transitions.transition_to_open();
-                }
-            }
-            CircuitState::HalfOpen => {
-                self.transitions.transition_to_open();
-            }
-            _ => {}
-        }
+        CircuitBreakerStateRecorder::record_failure(self.state(), &self.transitions, &self.config);
     }
 
     /// Get current failure count
