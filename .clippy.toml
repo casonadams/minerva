@@ -15,13 +15,16 @@ too-many-arguments-threshold = 3
 # COMPLEXITY THRESHOLDS (Keep functions simple and understandable)
 # =============================================================================
 
-# Cognitive complexity per function (default: 25, we're stricter at 15)
+# Cognitive complexity per function (default: 25, we enforce stricter)
 # Measures how hard a function is to understand
 # Lower = simpler = easier to test and maintain
 # NOTE: This is cognitive complexity, not cyclomatic complexity
-# Cognitive is more nuanced and maps approximately to cyclomatic ÷ 2
-# So threshold of 15 roughly enforces cyclomatic ≤ 6 (we aim for ≤ 3)
-cognitive-complexity-threshold = 15
+# Cognitive is more nuanced and maps approximately:
+#   Cyclomatic ≤ 3 maps to cognitive ≤ 6-8
+#   Cyclomatic ≤ 5 maps to cognitive ≤ 10-12
+# We use 10 to target M ≤ 3 (new code) while being lenient on legacy code
+# Run: cargo clippy -- -W clippy::cognitive-complexity
+cognitive-complexity-threshold = 10
 
 # Type complexity threshold (avoid overly complex types)
 # Prevents type-level obfuscation and makes code more readable
