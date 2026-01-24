@@ -49,12 +49,58 @@
 use crate::error::{MinervaError, MinervaResult};
 use crate::inference::llama_adapter::{GenerationParams, InferenceBackend};
 use crate::inference::llama_tokenizer::LLaMATokenizer;
+use safetensors::SafeTensors;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 /// Type alias for weight tensors: name -> flattened vector
 type WeightTensors = HashMap<String, Vec<f32>>;
+
+/// Known model architecture types
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModelType {
+    /// Meta LLaMA / LLaMA-2
+    Llama,
+    /// Mistral AI models
+    Mistral,
+    /// Microsoft Phi models
+    Phi,
+    /// Alibaba Qwen models
+    Qwen,
+    /// Unknown or other architecture
+    Unknown,
+}
+
+impl ModelType {
+    /// Parse model type from string (typically from config.json)
+    pub fn parse(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "llama" => ModelType::Llama,
+            "mistral" => ModelType::Mistral,
+            "phi" => ModelType::Phi,
+            "qwen" => ModelType::Qwen,
+            _ => ModelType::Unknown,
+        }
+    }
+
+    /// Convert to string representation
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ModelType::Llama => "llama",
+            ModelType::Mistral => "mistral",
+            ModelType::Phi => "phi",
+            ModelType::Qwen => "qwen",
+            ModelType::Unknown => "unknown",
+        }
+    }
+}
+
+impl std::fmt::Display for ModelType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
 
 /// Model configuration loaded from model directory
 #[derive(Debug, Clone)]
@@ -67,8 +113,8 @@ pub struct ModelConfig {
     pub num_heads: usize,
     /// Number of transformer layers
     pub num_layers: usize,
-    /// Model type identifier (llama, mistral, phi, etc.)
-    pub model_type: String,
+    /// Model architecture type
+    pub model_type: ModelType,
 }
 
 impl Default for ModelConfig {
@@ -78,7 +124,7 @@ impl Default for ModelConfig {
             hidden_size: 4096,
             num_heads: 32,
             num_layers: 32,
-            model_type: "llama".to_string(),
+            model_type: ModelType::Llama,
         }
     }
 }
@@ -121,26 +167,164 @@ impl PureRustBackend {
 
     /// Load safetensors model file
     ///
-    /// Phase 9: This will integrate the actual safetensors loading
-    /// For now, we scaffold the structure and prepare for integration
-    fn load_safetensors(_path: &Path) -> MinervaResult<WeightTensors> {
-        // TODO: Phase 9 - Integrate safetensors crate
-        // use safetensors::SafeTensors;
-        // let file = std::fs::File::open(path)?;
-        // let safetensors = SafeTensors::deserialize(&file)?;
-        // Extract weights into HashMap
+    /// Loads weights from a safetensors file into memory for inference.
+    /// Supports common transformer architectures (LLaMA, Mistral, Phi, Qwen).
+    ///
+    /// # Weight Format
+    ///
+    /// Safetensors files contain tensors organized by layer:
+    /// - Embedding: model.embed_tokens.weight
+    /// - Attention: model.layers.{i}.self_attn.{q,k,v,o}_proj.weight
+    /// - Feedforward: model.layers.{i}.mlp.{up,down,gate}_proj.weight
+    /// - Normalization: model.layers.{i}.input_layernorm.weight
+    /// - Output: lm_head.weight
+    fn load_safetensors(path: &Path) -> MinervaResult<WeightTensors> {
+        // Validate path exists
+        if !path.exists() {
+            return Err(MinervaError::ModelNotFound(format!(
+                "Safetensors file not found: {}",
+                path.display()
+            )));
+        }
 
-        tracing::info!("Phase 9: safetensors loading will be implemented here");
-        Ok(HashMap::new())
+        // Validate file extension
+        if path.extension().and_then(|ext| ext.to_str()) != Some("safetensors") {
+            return Err(MinervaError::InferenceError(
+                "Expected .safetensors file extension".to_string(),
+            ));
+        }
+
+        // Open and read safetensors file into memory
+        use std::fs;
+
+        let file_data = fs::read(path).map_err(|e| {
+            MinervaError::InferenceError(format!("Failed to read safetensors file: {}", e))
+        })?;
+
+        // Deserialize safetensors from bytes
+        let safetensors = SafeTensors::deserialize(&file_data).map_err(|e| {
+            MinervaError::InferenceError(format!("Failed to deserialize safetensors: {}", e))
+        })?;
+
+        // Extract tensors into HashMap
+        let mut weights = HashMap::new();
+        let mut total_params = 0usize;
+
+        for (name, tensor) in safetensors.tensors() {
+            // Get tensor data as bytes
+            let data = tensor.data();
+            let data_len = data.len();
+
+            // Validate data alignment for f32 (4 bytes per element)
+            if data_len % 4 != 0 {
+                tracing::warn!(
+                    "Tensor {} has misaligned data size: {} bytes",
+                    name,
+                    data_len
+                );
+                continue;
+            }
+
+            // Convert bytes to f32 array
+            let f32_count = data_len / 4;
+            let mut f32_data = vec![0.0_f32; f32_count];
+
+            // Copy bytes to f32 slice (assuming little-endian format)
+            for (idx, f32_val) in f32_data.iter_mut().enumerate() {
+                let byte_idx = idx * 4;
+                let bytes = [
+                    data[byte_idx],
+                    data[byte_idx + 1],
+                    data[byte_idx + 2],
+                    data[byte_idx + 3],
+                ];
+                *f32_val = f32::from_le_bytes(bytes);
+            }
+
+            total_params += f32_count;
+            weights.insert(name.to_string(), f32_data);
+
+            tracing::debug!(
+                "Loaded tensor {}: shape {:?}, {} parameters",
+                name,
+                tensor.shape(),
+                f32_count
+            );
+        }
+
+        tracing::info!(
+            "Loaded safetensors file: {} tensors, {} parameters",
+            weights.len(),
+            total_params
+        );
+
+        Ok(weights)
     }
 
-    /// Load model configuration from JSON
+    /// Load model configuration from config.json
     ///
-    /// Expects config.json in the same directory as the model
-    fn load_config(_path: &Path) -> MinervaResult<ModelConfig> {
-        // TODO: Phase 9 - Load and parse config.json
-        // For now, return sensible defaults
+    /// Parses configuration from config.json in the model directory.
+    /// Supports common model architectures with sensible defaults.
+    ///
+    /// # Supported Architectures
+    ///
+    /// - LLaMA: vocab_size, hidden_size, num_attention_heads, num_hidden_layers
+    /// - Mistral: Similar to LLaMA
+    /// - Phi: num_hidden_layers instead of some variations
+    /// - Qwen: Similar with potential qwen_type field
+    fn load_config(model_path: &Path) -> MinervaResult<ModelConfig> {
+        // Find config.json in same directory as model
+        let config_path = if let Some(file_name) = model_path.file_name() {
+            if file_name == "model.safetensors" {
+                // If path is model.safetensors, look in same directory
+                model_path.parent().map(|p| p.join("config.json"))
+            } else if model_path.is_dir() {
+                // If path is directory, look for config.json inside
+                Some(model_path.join("config.json"))
+            } else {
+                // Otherwise, look in parent directory
+                Some(
+                    model_path
+                        .parent()
+                        .unwrap_or_else(|| Path::new("."))
+                        .join("config.json"),
+                )
+            }
+        } else {
+            // No file name, use as directory
+            Some(model_path.join("config.json"))
+        };
 
+        let config_path = config_path.ok_or_else(|| {
+            MinervaError::InferenceError("Cannot determine config.json location".to_string())
+        })?;
+
+        // Try to load config.json if it exists
+        if config_path.exists() {
+            match Self::parse_config_json(&config_path) {
+                Ok(config) => {
+                    tracing::info!(
+                        "Loaded config from {}: vocab={}, hidden={}, heads={}, layers={}",
+                        config_path.display(),
+                        config.vocab_size,
+                        config.hidden_size,
+                        config.num_heads,
+                        config.num_layers
+                    );
+                    return Ok(config);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to parse config.json: {}, using defaults", e);
+                }
+            }
+        } else {
+            tracing::info!(
+                "config.json not found at {}, using defaults",
+                config_path.display()
+            );
+        }
+
+        // Fall back to defaults
         let config = ModelConfig::default();
         tracing::info!(
             "Using default config: vocab={}, hidden={}, heads={}, layers={}",
@@ -150,6 +334,130 @@ impl PureRustBackend {
             config.num_layers
         );
         Ok(config)
+    }
+
+    /// Parse config.json file
+    ///
+    /// Supports JSON format with common model architecture fields
+    fn parse_config_json(path: &Path) -> MinervaResult<ModelConfig> {
+        use std::fs;
+
+        let content = fs::read_to_string(path).map_err(|e| {
+            MinervaError::InferenceError(format!("Failed to read config.json: {}", e))
+        })?;
+
+        // Try to parse as JSON (using serde_json if available)
+        // For now, use simple string parsing as fallback
+        let config = Self::parse_config_simple(&content)?;
+        Ok(config)
+    }
+
+    /// Simple JSON parsing for config.json
+    ///
+    /// Extracts key fields without full JSON parsing
+    /// Supports: vocab_size, hidden_size, num_attention_heads, num_hidden_layers
+    fn parse_config_simple(json_str: &str) -> MinervaResult<ModelConfig> {
+        // Helper to extract integer values from JSON-like format
+        fn extract_int(json: &str, key: &str) -> Option<usize> {
+            let search = format!("\"{}\":", key);
+            json.find(&search).and_then(|pos| {
+                let after = &json[pos + search.len()..];
+                // Skip whitespace and comma
+                let trimmed = after.trim_start();
+                // Find the number
+                let num_end = trimmed
+                    .find(|c: char| !c.is_ascii_digit())
+                    .unwrap_or(trimmed.len());
+                trimmed[..num_end].parse().ok()
+            })
+        }
+
+        let vocab_size = extract_int(json_str, "vocab_size")
+            .or_else(|| extract_int(json_str, "vocabulary_size"))
+            .unwrap_or(32000);
+
+        let hidden_size = extract_int(json_str, "hidden_size")
+            .or_else(|| extract_int(json_str, "d_model"))
+            .unwrap_or(4096);
+
+        let num_heads = extract_int(json_str, "num_attention_heads")
+            .or_else(|| extract_int(json_str, "num_heads"))
+            .unwrap_or(32);
+
+        let num_layers = extract_int(json_str, "num_hidden_layers")
+            .or_else(|| extract_int(json_str, "num_layers"))
+            .or_else(|| extract_int(json_str, "depth"))
+            .unwrap_or(32);
+
+        // Extract model type from config.json "architectures" field or "model_type" field
+        let model_type = Self::extract_model_type(json_str);
+
+        Ok(ModelConfig {
+            vocab_size,
+            hidden_size,
+            num_heads,
+            num_layers,
+            model_type,
+        })
+    }
+
+    /// Extract model type from config.json
+    ///
+    /// Looks for explicit "model_type" or "architectures" field.
+    /// This is more reliable than content matching.
+    fn extract_model_type(json_str: &str) -> ModelType {
+        // First try: explicit "model_type" field (most reliable)
+        if let Some(model_type_val) = Self::extract_field_string(json_str, "model_type") {
+            return ModelType::parse(&model_type_val);
+        }
+
+        // Second try: "architectures" field (list of architecture names)
+        if let Some(arch_val) = Self::extract_field_string(json_str, "architectures") {
+            // architectures is typically like ["LlamaForCausalLM"]
+            let arch_lower = arch_val.to_lowercase();
+            if arch_lower.contains("llama") {
+                return ModelType::Llama;
+            }
+            if arch_lower.contains("mistral") {
+                return ModelType::Mistral;
+            }
+            if arch_lower.contains("phi") {
+                return ModelType::Phi;
+            }
+            if arch_lower.contains("qwen") {
+                return ModelType::Qwen;
+            }
+        }
+
+        // Fallback: default to unknown
+        ModelType::Unknown
+    }
+
+    /// Extract a string field value from JSON
+    ///
+    /// Handles both quoted strings and identifiers
+    fn extract_field_string(json: &str, key: &str) -> Option<String> {
+        let search = format!("\"{}\":", key);
+        json.find(&search).and_then(|pos| {
+            let after = &json[pos + search.len()..];
+            let trimmed = after.trim_start();
+
+            // Skip opening quote or bracket
+            if let Some(rest) = trimmed.strip_prefix('"') {
+                // String value: find closing quote
+                rest.find('"').map(|end| rest[..end].to_string())
+            } else if let Some(inner_part) = trimmed.strip_prefix('[') {
+                // Array value like ["item"]: extract first item
+                let inner = inner_part.trim_start();
+                if let Some(rest) = inner.strip_prefix('"') {
+                    rest.find('"').map(|end| rest[..end].to_string())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
     }
 
     /// Forward pass through transformer network
@@ -468,7 +776,51 @@ mod tests {
         assert_eq!(config.hidden_size, 4096);
         assert_eq!(config.num_heads, 32);
         assert_eq!(config.num_layers, 32);
-        assert_eq!(config.model_type, "llama");
+        assert_eq!(config.model_type, ModelType::Llama);
+    }
+
+    #[test]
+    fn test_model_type_parse() {
+        assert_eq!(ModelType::parse("llama"), ModelType::Llama);
+        assert_eq!(ModelType::parse("LLAMA"), ModelType::Llama);
+        assert_eq!(ModelType::parse("mistral"), ModelType::Mistral);
+        assert_eq!(ModelType::parse("Phi"), ModelType::Phi);
+        assert_eq!(ModelType::parse("qwen"), ModelType::Qwen);
+        assert_eq!(ModelType::parse("unknown"), ModelType::Unknown);
+        assert_eq!(ModelType::parse("unsupported"), ModelType::Unknown);
+    }
+
+    #[test]
+    fn test_model_type_as_str() {
+        assert_eq!(ModelType::Llama.as_str(), "llama");
+        assert_eq!(ModelType::Mistral.as_str(), "mistral");
+        assert_eq!(ModelType::Phi.as_str(), "phi");
+        assert_eq!(ModelType::Qwen.as_str(), "qwen");
+        assert_eq!(ModelType::Unknown.as_str(), "unknown");
+    }
+
+    #[test]
+    fn test_model_type_display() {
+        assert_eq!(ModelType::Llama.to_string(), "llama");
+        assert_eq!(ModelType::Mistral.to_string(), "mistral");
+    }
+
+    #[test]
+    fn test_extract_model_type_from_json() {
+        // Test with explicit model_type field
+        let json1 = r#"{"model_type": "llama", "vocab_size": 32000}"#;
+        let config1 = PureRustBackend::parse_config_simple(json1).unwrap();
+        assert_eq!(config1.model_type, ModelType::Llama);
+
+        // Test with architectures field
+        let json2 = r#"{"architectures": ["MistralForCausalLM"], "hidden_size": 4096}"#;
+        let config2 = PureRustBackend::parse_config_simple(json2).unwrap();
+        assert_eq!(config2.model_type, ModelType::Mistral);
+
+        // Test with unknown type
+        let json3 = r#"{"vocab_size": 32000, "hidden_size": 4096}"#;
+        let config3 = PureRustBackend::parse_config_simple(json3).unwrap();
+        assert_eq!(config3.model_type, ModelType::Unknown);
     }
 
     #[test]
