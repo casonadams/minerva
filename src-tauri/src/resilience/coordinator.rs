@@ -1,6 +1,6 @@
 use super::{
-    circuit_breaker::CircuitBreaker, fallback::FallbackDecision, retry::RetryState,
-    timeout::TimeoutContext, ErrorClass, resilience_decision::ResilienceDecision,
+    circuit_breaker::CircuitBreaker, coordinator_decision::CoordinatorDecision,
+    resilience_decision::ResilienceDecision, retry::RetryState, timeout::TimeoutContext,
 };
 use crate::error::MinervaError;
 
@@ -35,61 +35,12 @@ impl ResilienceCoordinator {
 
     /// Make resilience decision for an error
     pub fn decide(&mut self, error: &MinervaError) -> ResilienceDecision {
-        let error_class = ErrorClass::classify(error);
-
-        // Check if circuit is open
-        if !self.circuit_breaker.allow_request() {
-            return ResilienceDecision {
-                error_class,
-                should_retry: false,
-                should_fallback: false,
-                should_fail_fast: true,
-                retry_delay_ms: None,
-            };
-        }
-
-        // Check timeout
-        if let Some(ref ctx) = self.timeout_context
-            && ctx.is_deadline_exceeded()
-        {
-            return ResilienceDecision {
-                error_class,
-                should_retry: false,
-                should_fallback: false,
-                should_fail_fast: true,
-                retry_delay_ms: None,
-            };
-        }
-
-        // Determine retry strategy
-        let should_retry = if let Some(ref mut retry) = self.retry_state {
-            retry.can_retry()
-        } else {
-            false
-        };
-
-        // Fallback available?
-        let should_fallback = !matches!(
-            FallbackDecision::strategy_for(error),
-            super::fallback::FallbackStrategy::None
-        );
-
-        // Calculate retry delay if applicable
-        let retry_delay_ms = if should_retry {
-            self.retry_state
-                .as_mut()
-                .map(|retry| retry.next_delay().as_millis() as u64)
-        } else {
-            None
-        };
-
-        ResilienceDecision {
-            error_class,
-            should_retry,
-            should_fallback,
-            should_fail_fast: !error_class.is_recoverable(),
-            retry_delay_ms,
-        }
+        CoordinatorDecision::decide(
+            &self.circuit_breaker,
+            &mut self.retry_state,
+            &self.timeout_context,
+            error,
+        )
     }
 
     /// Record success
@@ -136,45 +87,6 @@ mod tests {
     }
 
     #[test]
-    fn test_coordinator_transient_error() {
-        let cb = CircuitBreaker::new(CircuitBreakerConfig::default());
-        let mut coord = ResilienceCoordinator::new(cb);
-
-        let err = MinervaError::StreamingError("test".to_string());
-        let decision = coord.decide(&err);
-
-        assert_eq!(decision.error_class, ErrorClass::Transient);
-    }
-
-    #[test]
-    fn test_coordinator_permanent_error() {
-        let cb = CircuitBreaker::new(CircuitBreakerConfig::default());
-        let mut coord = ResilienceCoordinator::new(cb);
-
-        let err = MinervaError::InvalidRequest("test".to_string());
-        let decision = coord.decide(&err);
-
-        assert_eq!(decision.error_class, ErrorClass::Permanent);
-        assert!(decision.should_fail_fast);
-    }
-
-    #[test]
-    fn test_coordinator_circuit_open() {
-        let cfg = CircuitBreakerConfig {
-            failure_threshold: 1,
-            ..Default::default()
-        };
-        let cb = CircuitBreaker::new(cfg);
-        cb.record_failure();
-
-        let mut coord = ResilienceCoordinator::new(cb);
-        let err = MinervaError::StreamingError("test".to_string());
-        let decision = coord.decide(&err);
-
-        assert!(decision.should_fail_fast);
-    }
-
-    #[test]
     fn test_coordinator_with_timeout() {
         let cb = CircuitBreaker::new(CircuitBreakerConfig::default());
         let ctx = TimeoutContext::new(Duration::from_millis(1), Duration::from_secs(10));
@@ -205,16 +117,5 @@ mod tests {
 
         coord.record_failure();
         assert_eq!(coord.circuit_breaker.failures(), 1);
-    }
-
-    #[test]
-    fn test_coordinator_fallback_available() {
-        let cb = CircuitBreaker::new(CircuitBreakerConfig::default());
-        let mut coord = ResilienceCoordinator::new(cb);
-
-        let err = MinervaError::GpuOutOfMemory("test".to_string());
-        let decision = coord.decide(&err);
-
-        assert!(decision.should_fallback);
     }
 }

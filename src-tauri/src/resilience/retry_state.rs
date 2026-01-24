@@ -79,7 +79,7 @@ mod tests {
         assert!(delay1 >= Duration::from_millis(0));
 
         assert!(state.can_retry());
-        let delay2 = state.next_delay();
+        let _delay2 = state.next_delay();
         assert_eq!(state.attempt(), 2);
 
         assert!(state.can_retry());
