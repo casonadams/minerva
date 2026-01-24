@@ -1,6 +1,6 @@
-/// Batch optimization utilities for memory and latency
-///
-/// Provides functions to estimate memory overhead and calculate optimal batch sizes
+//! Batch optimization utilities for memory and latency
+//!
+//! Provides functions to estimate memory overhead and calculate optimal batch sizes.
 
 /// Estimate memory overhead per item in batch operations
 pub fn estimate_memory_overhead(num_items: usize) -> f64 {

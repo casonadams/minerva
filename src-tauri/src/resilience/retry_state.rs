@@ -2,6 +2,7 @@ use super::retry_config::RetryConfig;
 use std::time::Duration;
 
 /// Retry state tracker
+#[derive(Clone)]
 pub struct RetryState {
     attempt: u32,
     config: RetryConfig,

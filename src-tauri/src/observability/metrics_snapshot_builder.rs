@@ -2,21 +2,33 @@ use super::metrics::MetricsSnapshot;
 use super::metrics_analyzer::MetricsAnalyzer;
 use std::time::Duration;
 
+/// Parameters for building a metrics snapshot.
+pub struct SnapshotParams {
+    pub total: u64,
+    pub success: u64,
+    pub failed: u64,
+    pub hits: u64,
+    pub misses: u64,
+    pub times: Vec<Duration>,
+    pub uptime_secs: u64,
+}
+
 /// Builds metrics snapshots from raw metrics state
 pub struct SnapshotBuilder;
 
 impl SnapshotBuilder {
     /// Build snapshot from current metrics state
-    pub fn build(
-        total: u64,
-        success: u64,
-        failed: u64,
-        hits: u64,
-        misses: u64,
-        times: &[Duration],
-        uptime_secs: u64,
-    ) -> MetricsSnapshot {
-        let (avg, min, max, p50, p95, p99) = MetricsAnalyzer::analyze_times(times);
+    pub fn build(params: SnapshotParams) -> MetricsSnapshot {
+        let SnapshotParams {
+            total,
+            success,
+            failed,
+            hits,
+            misses,
+            times,
+            uptime_secs,
+        } = params;
+        let (avg, min, max, p50, p95, p99) = MetricsAnalyzer::analyze_times(&times);
 
         let rps = if uptime_secs > 0 {
             total as f64 / uptime_secs as f64
@@ -62,7 +74,15 @@ mod tests {
 
     #[test]
     fn test_snapshot_builder_with_zero_metrics() {
-        let snapshot = SnapshotBuilder::build(0, 0, 0, 0, 0, &[], 0);
+        let snapshot = SnapshotBuilder::build(SnapshotParams {
+            total: 0,
+            success: 0,
+            failed: 0,
+            hits: 0,
+            misses: 0,
+            times: vec![],
+            uptime_secs: 0,
+        });
         assert_eq!(snapshot.total_requests, 0);
         assert_eq!(snapshot.error_rate_percent, 0.0);
         assert_eq!(snapshot.cache_hit_rate_percent, 0.0);
@@ -70,19 +90,43 @@ mod tests {
 
     #[test]
     fn test_snapshot_builder_rps_calculation() {
-        let snapshot = SnapshotBuilder::build(100, 90, 10, 50, 50, &[], 10);
+        let snapshot = SnapshotBuilder::build(SnapshotParams {
+            total: 100,
+            success: 90,
+            failed: 10,
+            hits: 50,
+            misses: 50,
+            times: vec![],
+            uptime_secs: 10,
+        });
         assert_eq!(snapshot.rps, 10.0); // 100 / 10 = 10.0
     }
 
     #[test]
     fn test_snapshot_builder_error_rate() {
-        let snapshot = SnapshotBuilder::build(100, 80, 20, 0, 0, &[], 5);
+        let snapshot = SnapshotBuilder::build(SnapshotParams {
+            total: 100,
+            success: 80,
+            failed: 20,
+            hits: 0,
+            misses: 0,
+            times: vec![],
+            uptime_secs: 5,
+        });
         assert_eq!(snapshot.error_rate_percent, 20.0);
     }
 
     #[test]
     fn test_snapshot_builder_hit_rate() {
-        let snapshot = SnapshotBuilder::build(0, 0, 0, 80, 20, &[], 0);
+        let snapshot = SnapshotBuilder::build(SnapshotParams {
+            total: 0,
+            success: 0,
+            failed: 0,
+            hits: 80,
+            misses: 20,
+            times: vec![],
+            uptime_secs: 0,
+        });
         assert_eq!(snapshot.cache_hit_rate_percent, 80.0);
     }
 }

@@ -54,7 +54,7 @@ mod tests {
 
     #[test]
     fn test_analyze_percentiles() {
-        let times: Vec<Duration> = (1..=100).map(|i| Duration::from_millis(i)).collect();
+        let times: Vec<Duration> = (1..=100).map(Duration::from_millis).collect();
         let (avg, min, max, p50, p95, p99) = MetricsAnalyzer::analyze_times(&times);
 
         assert!(avg > 0.0);

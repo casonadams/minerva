@@ -118,34 +118,6 @@ impl GGUFModelLoader {
 
     // ==================== Helper Functions ====================
 
-    fn read_u8(file: &mut File) -> MinervaResult<u8> {
-        let mut buf = [0u8; 1];
-        file.read_exact(&mut buf)
-            .map_err(|e| MinervaError::ModelLoadingError(e.to_string()))?;
-        Ok(buf[0])
-    }
-
-    fn read_i8(file: &mut File) -> MinervaResult<i8> {
-        let mut buf = [0u8; 1];
-        file.read_exact(&mut buf)
-            .map_err(|e| MinervaError::ModelLoadingError(e.to_string()))?;
-        Ok(buf[0] as i8)
-    }
-
-    fn read_u16(file: &mut File) -> MinervaResult<u16> {
-        let mut buf = [0u8; 2];
-        file.read_exact(&mut buf)
-            .map_err(|e| MinervaError::ModelLoadingError(e.to_string()))?;
-        Ok(u16::from_le_bytes(buf))
-    }
-
-    fn read_i16(file: &mut File) -> MinervaResult<i16> {
-        let mut buf = [0u8; 2];
-        file.read_exact(&mut buf)
-            .map_err(|e| MinervaError::ModelLoadingError(e.to_string()))?;
-        Ok(i16::from_le_bytes(buf))
-    }
-
     fn read_u32(file: &mut File) -> MinervaResult<u32> {
         let mut buf = [0u8; 4];
         file.read_exact(&mut buf)
@@ -153,48 +125,11 @@ impl GGUFModelLoader {
         Ok(u32::from_le_bytes(buf))
     }
 
-    fn read_i32(file: &mut File) -> MinervaResult<i32> {
-        let mut buf = [0u8; 4];
-        file.read_exact(&mut buf)
-            .map_err(|e| MinervaError::ModelLoadingError(e.to_string()))?;
-        Ok(i32::from_le_bytes(buf))
-    }
-
-    fn read_f32(file: &mut File) -> MinervaResult<f32> {
-        let mut buf = [0u8; 4];
-        file.read_exact(&mut buf)
-            .map_err(|e| MinervaError::ModelLoadingError(e.to_string()))?;
-        Ok(f32::from_le_bytes(buf))
-    }
-
     fn read_u64(file: &mut File) -> MinervaResult<u64> {
         let mut buf = [0u8; 8];
         file.read_exact(&mut buf)
             .map_err(|e| MinervaError::ModelLoadingError(e.to_string()))?;
         Ok(u64::from_le_bytes(buf))
-    }
-
-    fn read_i64(file: &mut File) -> MinervaResult<i64> {
-        let mut buf = [0u8; 8];
-        file.read_exact(&mut buf)
-            .map_err(|e| MinervaError::ModelLoadingError(e.to_string()))?;
-        Ok(i64::from_le_bytes(buf))
-    }
-
-    fn read_f64(file: &mut File) -> MinervaResult<f64> {
-        let mut buf = [0u8; 8];
-        file.read_exact(&mut buf)
-            .map_err(|e| MinervaError::ModelLoadingError(e.to_string()))?;
-        Ok(f64::from_le_bytes(buf))
-    }
-
-    fn read_string(file: &mut File) -> MinervaResult<String> {
-        let len = Self::read_u32(file)? as usize;
-        let mut buf = vec![0u8; len];
-        file.read_exact(&mut buf)
-            .map_err(|e| MinervaError::ModelLoadingError(e.to_string()))?;
-        String::from_utf8(buf)
-            .map_err(|e| MinervaError::ModelLoadingError(format!("Invalid UTF-8 in string: {}", e)))
     }
 }
 
@@ -276,19 +211,5 @@ mod tests {
         let mut f = File::open(file.path()).unwrap();
         let value = GGUFModelLoader::read_u64(&mut f).unwrap();
         assert_eq!(value, 1234567890);
-    }
-
-    #[test]
-    fn test_read_string() {
-        let mut file = NamedTempFile::new().unwrap();
-        let test_str = "hello";
-        file.write_all(&(test_str.len() as u32).to_le_bytes())
-            .unwrap();
-        file.write_all(test_str.as_bytes()).unwrap();
-        file.flush().unwrap();
-
-        let mut f = File::open(file.path()).unwrap();
-        let value = GGUFModelLoader::read_string(&mut f).unwrap();
-        assert_eq!(value, test_str);
     }
 }

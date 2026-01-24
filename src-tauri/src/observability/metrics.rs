@@ -1,4 +1,4 @@
-use super::metrics_snapshot_builder::SnapshotBuilder;
+use super::metrics_snapshot_builder::{SnapshotBuilder, SnapshotParams};
 use super::response_time_store::ResponseTimeStore;
 /// Metrics Collection and Aggregation
 ///
@@ -79,7 +79,15 @@ impl MetricsCollector {
         let times = self.state.response_times.get_times();
         let uptime_secs = self.state.start_time.elapsed().as_secs();
 
-        SnapshotBuilder::build(total, success, failed, hits, misses, &times, uptime_secs)
+        SnapshotBuilder::build(SnapshotParams {
+            total,
+            success,
+            failed,
+            hits,
+            misses,
+            times,
+            uptime_secs,
+        })
     }
 
     /// Reset all metrics

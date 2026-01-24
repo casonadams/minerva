@@ -9,8 +9,8 @@ use std::sync::Arc;
 /// - Operation timing
 /// - Bottleneck detection
 /// - Performance reports
-
-/// Operation profile data
+///
+/// Operation profile data structure to hold profiling statistics.
 #[derive(Debug, Clone)]
 pub struct OperationProfile {
     /// Operation name

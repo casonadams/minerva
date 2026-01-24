@@ -35,12 +35,13 @@ impl ResilienceCoordinator {
 
     /// Make resilience decision for an error
     pub fn decide(&mut self, error: &MinervaError) -> ResilienceDecision {
-        CoordinatorDecision::decide(
-            &self.circuit_breaker,
-            &mut self.retry_state,
-            &self.timeout_context,
+        use crate::resilience::coordinator_decision::DecisionContext;
+        CoordinatorDecision::decide(DecisionContext {
+            circuit_breaker: &self.circuit_breaker,
+            retry_state: &mut self.retry_state,
+            timeout_context: &self.timeout_context,
             error,
-        )
+        })
     }
 
     /// Record success

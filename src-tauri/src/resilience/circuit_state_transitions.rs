@@ -9,6 +9,12 @@ pub struct StateTransitionHelper {
     opened_at: AtomicU64,
 }
 
+impl Default for StateTransitionHelper {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StateTransitionHelper {
     /// Create new transition helper
     pub fn new() -> Self {

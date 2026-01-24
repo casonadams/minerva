@@ -23,19 +23,34 @@ pub fn create_streaming_response(
         .collect();
 
     let token_count = tokens.len();
-    let chunks = build_stream_chunks(tokens, token_count, completion_id, created, model);
+    let chunks = build_stream_chunks(StreamChunkParams {
+        tokens,
+        token_count,
+        completion_id,
+        created,
+        model,
+    });
 
     let stream_iter = stream::iter(chunks);
     axum::response::sse::Sse::new(stream_iter).keep_alive(KeepAlive::default())
 }
 
-fn build_stream_chunks(
+struct StreamChunkParams {
     tokens: Vec<String>,
     token_count: usize,
     completion_id: String,
     created: i64,
     model: String,
-) -> Vec<Result<Event, String>> {
+}
+
+fn build_stream_chunks(params: StreamChunkParams) -> Vec<Result<Event, String>> {
+    let StreamChunkParams {
+        tokens,
+        token_count,
+        completion_id,
+        created,
+        model,
+    } = params;
     tokens
         .into_iter()
         .enumerate()
