@@ -6,7 +6,10 @@
 /// - Performance metrics collection
 /// - Request tracing and logging
 pub mod endpoints;
+pub mod health;
 pub mod metrics;
+pub mod metrics_response;
+pub mod readiness;
 pub mod tracing_middleware;
 
 use serde::{Deserialize, Serialize};
