@@ -1,3 +1,4 @@
+pub mod backend_selector;
 pub mod batch;
 pub mod batch_async;
 pub mod batch_measurement;
