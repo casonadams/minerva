@@ -3,9 +3,11 @@ pub mod config;
 pub mod error;
 pub mod error_recovery;
 pub mod inference;
+pub mod inference_api;
 pub mod logging;
 pub mod models;
 pub mod observability;
+pub mod performance;
 pub mod resilience;
 pub mod server;
 
