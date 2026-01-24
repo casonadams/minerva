@@ -1,5 +1,7 @@
+pub mod gguf_header;
 pub mod gguf_loader;
 pub mod gguf_parser;
+pub mod gguf_reader;
 pub mod gguf_tensor;
 pub mod loader;
 
