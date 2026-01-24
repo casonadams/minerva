@@ -18,6 +18,8 @@ pub mod batch;
 pub mod batch_async;
 pub mod batch_measurement;
 pub mod batch_optimized;
+pub mod batch_result_optimized;
+pub mod optimization_utils;
 pub mod batch_parallel;
 pub mod benchmarks;
 pub mod cache_optimizer;
