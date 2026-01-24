@@ -1,5 +1,5 @@
-use super::metrics_analyzer::MetricsAnalyzer;
-use parking_lot::RwLock;
+use super::metrics_snapshot_builder::SnapshotBuilder;
+use super::response_time_store::ResponseTimeStore;
 /// Metrics Collection and Aggregation
 ///
 /// Tracks server-wide metrics:
@@ -20,7 +20,7 @@ struct MetricsState {
     total_requests: AtomicU64,
     successful_requests: AtomicU64,
     failed_requests: AtomicU64,
-    response_times: RwLock<Vec<Duration>>,
+    response_times: ResponseTimeStore,
     cache_hits: AtomicU64,
     cache_misses: AtomicU64,
     start_time: std::time::Instant,
@@ -34,7 +34,7 @@ impl MetricsCollector {
                 total_requests: AtomicU64::new(0),
                 successful_requests: AtomicU64::new(0),
                 failed_requests: AtomicU64::new(0),
-                response_times: RwLock::new(Vec::new()),
+                response_times: ResponseTimeStore::new(),
                 cache_hits: AtomicU64::new(0),
                 cache_misses: AtomicU64::new(0),
                 start_time: std::time::Instant::now(),
@@ -76,45 +76,10 @@ impl MetricsCollector {
         let hits = self.state.cache_hits.load(Ordering::Relaxed);
         let misses = self.state.cache_misses.load(Ordering::Relaxed);
 
-        let times = self.state.response_times.read();
-        let (avg, min, max, p50, p95, p99) = MetricsAnalyzer::analyze_times(&times);
-
+        let times = self.state.response_times.get_times();
         let uptime_secs = self.state.start_time.elapsed().as_secs();
-        let rps = if uptime_secs > 0 {
-            total as f64 / uptime_secs as f64
-        } else {
-            0.0
-        };
 
-        let error_rate = if total > 0 {
-            (failed as f64 / total as f64) * 100.0
-        } else {
-            0.0
-        };
-
-        let hit_rate = if (hits + misses) > 0 {
-            (hits as f64 / (hits + misses) as f64) * 100.0
-        } else {
-            0.0
-        };
-
-        MetricsSnapshot {
-            total_requests: total,
-            successful_requests: success,
-            failed_requests: failed,
-            avg_response_time_ms: avg,
-            min_response_time_ms: min,
-            max_response_time_ms: max,
-            p50_response_time_ms: p50,
-            p95_response_time_ms: p95,
-            p99_response_time_ms: p99,
-            rps,
-            error_rate_percent: error_rate,
-            cache_hits: hits,
-            cache_misses: misses,
-            cache_hit_rate_percent: hit_rate,
-            uptime_seconds: uptime_secs,
-        }
+        SnapshotBuilder::build(total, success, failed, hits, misses, &times, uptime_secs)
     }
 
     /// Reset all metrics
@@ -124,16 +89,11 @@ impl MetricsCollector {
         self.state.failed_requests.store(0, Ordering::Relaxed);
         self.state.cache_hits.store(0, Ordering::Relaxed);
         self.state.cache_misses.store(0, Ordering::Relaxed);
-        self.state.response_times.write().clear();
+        self.state.response_times.clear();
     }
 
     fn store_response_time(&self, time: Duration) {
-        let mut times = self.state.response_times.write();
-        times.push(time);
-        // Keep only last 10000 measurements to avoid unbounded memory
-        if times.len() > 10000 {
-            times.drain(0..5000);
-        }
+        self.state.response_times.store(time);
     }
 }
 

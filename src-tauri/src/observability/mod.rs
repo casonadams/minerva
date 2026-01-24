@@ -14,8 +14,10 @@ pub mod metrics_analyzer;
 pub mod metrics_calculator;
 pub mod metrics_response;
 pub mod metrics_snapshot;
+pub mod metrics_snapshot_builder;
 pub mod readiness;
 pub mod request_trace;
+pub mod response_time_store;
 pub mod trace_id_generator;
 pub mod tracing_middleware;
 
