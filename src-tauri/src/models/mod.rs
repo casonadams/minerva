@@ -1,3 +1,4 @@
+pub mod gguf_data_type;
 pub mod gguf_header;
 pub mod gguf_loader;
 pub mod gguf_parser;
