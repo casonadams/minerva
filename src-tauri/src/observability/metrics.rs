@@ -1,3 +1,4 @@
+use super::metrics_analyzer::MetricsAnalyzer;
 use parking_lot::RwLock;
 /// Metrics Collection and Aggregation
 ///
@@ -47,25 +48,14 @@ impl MetricsCollector {
             .successful_requests
             .fetch_add(1, Ordering::Relaxed);
         self.state.total_requests.fetch_add(1, Ordering::Relaxed);
-
-        let mut times = self.state.response_times.write();
-        times.push(response_time);
-        // Keep only last 10000 measurements to avoid unbounded memory
-        if times.len() > 10000 {
-            times.drain(0..5000);
-        }
+        self.store_response_time(response_time);
     }
 
     /// Record a failed request with response time
     pub fn record_failure(&self, response_time: Duration) {
         self.state.failed_requests.fetch_add(1, Ordering::Relaxed);
         self.state.total_requests.fetch_add(1, Ordering::Relaxed);
-
-        let mut times = self.state.response_times.write();
-        times.push(response_time);
-        if times.len() > 10000 {
-            times.drain(0..5000);
-        }
+        self.store_response_time(response_time);
     }
 
     /// Record cache hit
@@ -87,7 +77,7 @@ impl MetricsCollector {
         let misses = self.state.cache_misses.load(Ordering::Relaxed);
 
         let times = self.state.response_times.read();
-        let (avg, min, max, p50, p95, p99) = Self::analyze_times(&times);
+        let (avg, min, max, p50, p95, p99) = MetricsAnalyzer::analyze_times(&times);
 
         let uptime_secs = self.state.start_time.elapsed().as_secs();
         let rps = if uptime_secs > 0 {
@@ -137,35 +127,13 @@ impl MetricsCollector {
         self.state.response_times.write().clear();
     }
 
-    fn analyze_times(times: &[Duration]) -> (f64, f64, f64, f64, f64, f64) {
-        if times.is_empty() {
-            return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+    fn store_response_time(&self, time: Duration) {
+        let mut times = self.state.response_times.write();
+        times.push(time);
+        // Keep only last 10000 measurements to avoid unbounded memory
+        if times.len() > 10000 {
+            times.drain(0..5000);
         }
-
-        let mut vals: Vec<u128> = times.iter().map(|d| d.as_millis()).collect();
-        vals.sort_unstable();
-
-        let sum: u128 = vals.iter().sum();
-        let avg = sum as f64 / vals.len() as f64;
-        let min = vals[0] as f64;
-        let max = vals[vals.len() - 1] as f64;
-
-        let p50_idx = (vals.len() / 2).saturating_sub(1).min(vals.len() - 1);
-        let p95_idx = ((vals.len() as f64 * 0.95) as usize)
-            .saturating_sub(1)
-            .min(vals.len() - 1);
-        let p99_idx = ((vals.len() as f64 * 0.99) as usize)
-            .saturating_sub(1)
-            .min(vals.len() - 1);
-
-        (
-            avg,
-            min,
-            max,
-            vals[p50_idx] as f64,
-            vals[p95_idx] as f64,
-            vals[p99_idx] as f64,
-        )
     }
 }
 
