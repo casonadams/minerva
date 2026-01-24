@@ -98,7 +98,7 @@ pub async fn create_server(state: ServerState) -> Router {
 }
 
 async fn health_check_enhanced() -> impl IntoResponse {
-    use crate::observability::endpoints::HealthEndpointResponse;
+    use crate::observability::health::HealthEndpointResponse;
 
     let mut resp = HealthEndpointResponse {
         timestamp: chrono::Local::now().to_rfc3339(),

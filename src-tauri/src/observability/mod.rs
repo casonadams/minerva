@@ -1,3 +1,4 @@
+pub mod component_info;
 /// Server Observability & Metrics
 ///
 /// Provides comprehensive observability for production deployments:
@@ -7,6 +8,7 @@
 /// - Request tracing and logging
 pub mod endpoints;
 pub mod health;
+pub mod health_types;
 pub mod metrics;
 pub mod metrics_response;
 pub mod metrics_snapshot;
