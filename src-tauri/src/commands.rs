@@ -1,3 +1,5 @@
+pub mod model_commands;
+
 use crate::config::AppConfig;
 use crate::models::ModelInfo;
 use std::path::PathBuf;
