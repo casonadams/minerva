@@ -64,10 +64,12 @@ fn test_server_state_metrics_collector() {
 #[test]
 fn test_app_config_models_dir_override() {
     let (_temp, models_dir) = setup_test_models_dir();
-    let mut config = AppConfig::default();
 
     // Test that config can be overridden with CLI arguments
-    config.models_dir = models_dir.clone();
+    let config = AppConfig {
+        models_dir: models_dir.clone(),
+        ..Default::default()
+    };
     assert_eq!(
         config.models_dir, models_dir,
         "Config models_dir should be overridable"

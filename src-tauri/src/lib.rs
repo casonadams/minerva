@@ -1,3 +1,4 @@
+pub mod api_protocol;
 pub mod cli;
 pub mod commands;
 pub mod config;
