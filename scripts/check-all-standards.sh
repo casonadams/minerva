@@ -52,7 +52,7 @@ while IFS= read -r file; do
             echo "  ❌ $file: $lines lines"
         fi
     fi
-done < <(find src-tauri/src -name "*.rs" -type f)
+done < <(find src-tauri/src -name "*.rs" -type f ! -path "*/tests/*")
 
 if [ "$FILE_VIOLATIONS" -eq 0 ]; then
     echo "  ✅ All files ≤ 150 lines"

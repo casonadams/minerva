@@ -16,7 +16,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Start the API server
-    Serve(cli::serve::ServeArgs),
+    Serve(cli::ServeArgs),
 }
 
 #[tokio::main]

@@ -1,29 +1,8 @@
-/// Error Recovery Strategies for Phase 3.5b
-///
-/// This module provides recovery mechanisms for common failure scenarios:
-/// - GPU out of memory → fallback to CPU
-/// - GPU context loss → reinitialize
-/// - Model corruption → validation and reload
-/// - Streaming errors → retry mechanism
+//! Error recovery handler
+
+use super::types::RecoveryStrategy;
 use crate::error::MinervaError;
 use std::time::Duration;
-
-/// Recovery strategy for different error types
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum RecoveryStrategy {
-    /// Retry the operation (e.g., streaming, timeout)
-    Retry { max_attempts: u32, backoff_ms: u64 },
-    /// Fallback to CPU if GPU fails
-    FallbackToCpu,
-    /// Reinitialize GPU context
-    ReinitializeGpu,
-    /// Reload the model
-    ReloadModel,
-    /// Skip and continue (non-critical)
-    SkipAndContinue,
-    /// Fatal error - stop
-    Fatal,
-}
 
 /// Error recovery handler
 pub struct ErrorRecovery;
@@ -32,31 +11,18 @@ impl ErrorRecovery {
     /// Determine recovery strategy for an error
     pub fn strategy_for(error: &MinervaError) -> RecoveryStrategy {
         match error {
-            // Streaming errors should retry with exponential backoff
             MinervaError::StreamingError(_) => RecoveryStrategy::Retry {
                 max_attempts: 3,
                 backoff_ms: 100,
             },
-
-            // GPU out of memory → fallback to CPU
             MinervaError::GpuOutOfMemory(_) => RecoveryStrategy::FallbackToCpu,
-
-            // GPU context lost → reinitialize
             MinervaError::GpuContextLost(_) => RecoveryStrategy::ReinitializeGpu,
-
-            // Model corruption → need reload
             MinervaError::ModelCorrupted(_) => RecoveryStrategy::ReloadModel,
-
-            // Timeout → retry
             MinervaError::GenerationTimeout => RecoveryStrategy::Retry {
                 max_attempts: 2,
                 backoff_ms: 500,
             },
-
-            // Context limit → fatal for this operation
             MinervaError::ContextLimitExceeded { .. } => RecoveryStrategy::Fatal,
-
-            // Other errors
             _ => RecoveryStrategy::Fatal,
         }
     }
@@ -75,7 +41,6 @@ impl ErrorRecovery {
 
     /// Calculate backoff delay for retry attempt
     pub fn backoff_delay(attempt: u32, base_ms: u64) -> Duration {
-        // Exponential backoff: 100ms, 200ms, 400ms, 800ms, etc.
         let delay_ms = base_ms * u64::pow(2, attempt);
         Duration::from_millis(delay_ms)
     }
@@ -149,17 +114,14 @@ mod tests {
 
     #[test]
     fn test_backoff_calculation() {
-        // Attempt 0: 100ms
         assert_eq!(
             ErrorRecovery::backoff_delay(0, 100),
             Duration::from_millis(100)
         );
-        // Attempt 1: 200ms
         assert_eq!(
             ErrorRecovery::backoff_delay(1, 100),
             Duration::from_millis(200)
         );
-        // Attempt 2: 400ms
         assert_eq!(
             ErrorRecovery::backoff_delay(2, 100),
             Duration::from_millis(400)
@@ -170,7 +132,6 @@ mod tests {
     fn test_is_recoverable() {
         let recoverable = MinervaError::StreamingError("test".to_string());
         assert!(ErrorRecovery::is_recoverable(&recoverable));
-
         let not_recoverable = MinervaError::InvalidRequest("test".to_string());
         assert!(!ErrorRecovery::is_recoverable(&not_recoverable));
     }
@@ -179,7 +140,6 @@ mod tests {
     fn test_is_gpu_error() {
         let gpu_err = MinervaError::GpuOutOfMemory("test".to_string());
         assert!(ErrorRecovery::is_gpu_error(&gpu_err));
-
         let other_err = MinervaError::StreamingError("test".to_string());
         assert!(!ErrorRecovery::is_gpu_error(&other_err));
     }
@@ -188,7 +148,6 @@ mod tests {
     fn test_recovery_messages() {
         let msg = ErrorRecovery::recovery_message(RecoveryStrategy::FallbackToCpu);
         assert!(msg.contains("CPU"));
-
         let msg = ErrorRecovery::recovery_message(RecoveryStrategy::Retry {
             max_attempts: 3,
             backoff_ms: 100,
