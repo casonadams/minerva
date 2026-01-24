@@ -1,6 +1,6 @@
 //! Error Recovery Strategies
 //!
-//! This module provides recovery mechanisms for common failure scenarios:
+//! Provides recovery mechanisms for common failure scenarios:
 //! - GPU out of memory → fallback to CPU
 //! - GPU context loss → reinitialize
 //! - Model corruption → validation and reload
@@ -8,6 +8,9 @@
 
 pub mod handler;
 pub mod types;
+
+#[cfg(test)]
+mod tests;
 
 pub use handler::ErrorRecovery;
 pub use types::RecoveryStrategy;
