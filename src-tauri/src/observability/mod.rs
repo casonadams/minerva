@@ -10,6 +10,8 @@ pub mod health;
 pub mod metrics;
 pub mod metrics_response;
 pub mod readiness;
+pub mod request_trace;
+pub mod trace_id_generator;
 pub mod tracing_middleware;
 
 use serde::{Deserialize, Serialize};
