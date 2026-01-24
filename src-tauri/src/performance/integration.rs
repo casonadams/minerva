@@ -1,3 +1,4 @@
+use super::metrics_analyzer_integration::MetricsAnalysisHelper;
 use parking_lot::RwLock;
 /// Performance Integration with Server
 ///
@@ -86,34 +87,19 @@ impl ServerMetricsAggregator {
     /// Get average tokens per second
     pub fn avg_tokens_per_second(&self) -> f64 {
         let metrics = self.inference_metrics.read();
-        if metrics.is_empty() {
-            return 0.0;
-        }
-
-        let sum: f64 = metrics.iter().map(|m| m.tokens_per_second).sum();
-        sum / metrics.len() as f64
+        MetricsAnalysisHelper::avg_tokens_per_second(&metrics)
     }
 
     /// Get average inference time
     pub fn avg_inference_time_ms(&self) -> f64 {
         let metrics = self.inference_metrics.read();
-        if metrics.is_empty() {
-            return 0.0;
-        }
-
-        let sum: u64 = metrics.iter().map(|m| m.duration_ms).sum();
-        sum as f64 / metrics.len() as f64
+        MetricsAnalysisHelper::avg_inference_time_ms(&metrics)
     }
 
     /// Get GPU usage percentage (how many used GPU)
     pub fn gpu_usage_percent(&self) -> f64 {
         let metrics = self.inference_metrics.read();
-        if metrics.is_empty() {
-            return 0.0;
-        }
-
-        let gpu_count = metrics.iter().filter(|m| m.used_gpu).count();
-        (gpu_count as f64 / metrics.len() as f64) * 100.0
+        MetricsAnalysisHelper::gpu_usage_percent(&metrics)
     }
 
     /// Get most recent metrics count

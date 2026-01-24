@@ -8,6 +8,7 @@
 pub mod adaptive;
 pub mod execution_modes;
 pub mod integration;
+pub mod metrics_analyzer_integration;
 pub mod metrics_queries;
 pub mod performance_metrics;
 pub mod profile_analyzer;
