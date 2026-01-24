@@ -28,431 +28,325 @@
 
 ---
 
-## Implementation Roadmap
+## Implementation Roadmap - REVISED: Pure Rust Approach
+
+**⚠️ CRITICAL DECISION:** No Python subprocess! All inference in pure Rust.
+
+### Architecture: Why Pure Rust?
+
+**❌ Python Subprocess Problems:**
+- Process spawn overhead on every request
+- Complex process management (start/stop/restart)
+- Python runtime dependency (+600MB)
+- Network overhead (subprocess → HTTP → subprocess)
+- Hard to debug and maintain
+- Performance hit from serialization/deserialization
+
+**✅ Pure Rust Solution:**
+- No external dependencies (use what we have)
+- Minimal performance overhead
+- Direct inference without serialization
+- Cleaner architecture
+- Easier testing and debugging
+- Self-contained, portable
+
+### Design: Hybrid Backend Strategy
+
+Instead of MlxBackend calling Python, implement **intelligent model format detection**:
+
+```rust
+// Strategy: Use what we have + what works
+match model_format {
+    Format::GGUF => {
+        // Use LlamaCppBackend (existing, proven)
+        // Fast, efficient, no dependencies
+        use_llama_cpp_backend(model)
+    }
+    Format::HuggingFaceFormat => {
+        // Option 1: Support via llama.cpp (works with many HF models)
+        // Option 2: Implement light-weight pure Rust inference
+        // Don't spawn Python subprocess!
+    }
+}
+```
 
 ### Day 1: Research & Architecture
 
-#### Morning: Environment Setup (1 hour)
-```bash
-# Install mlx-lm
-pip install mlx-lm
+#### Morning: Understand Model Formats (1 hour)
 
-# Test mlx-lm is working
-python3 -c "import mlx_lm; print('✅ mlx-lm available')"
+**Question:** What formats do users actually need?
 
-# Explore mlx-lm CLI
-python3 -m mlx_lm --help
+1. **GGUF** (90% of cases)
+   - ✅ Already supported via llama.cpp
+   - Already working
+   - Don't change this!
 
-# Try serving a model
-python3 -m mlx_lm.server --help
-```
+2. **HuggingFace Format** (safetensors, .bin, etc.)
+   - Many models available
+   - But can they be converted to GGUF?
+   - Research: llama.cpp can load some HF models directly!
 
-**Expected Output:** Help text showing available commands and options
+3. **Other formats?**
+   - ONNX, TensorFlow, etc.
+   - Are these needed for Phase 8?
+   - Probably not MVP-critical
 
-**Key Discoveries:**
-- Default port for mlx-lm server
-- Available model formats
-- Command-line options
-- Response format
+**Key Insight:** Maybe MlxBackend isn't needed yet. Improve LlamaCppBackend to handle more formats instead!
 
-#### Afternoon: Design Subprocess Integration (2 hours)
+#### Afternoon: Design Pure Rust Inference (2 hours)
 
-**Current Scaffolding (in mlx_backend.rs):**
+**Option 1: Extend LlamaCppBackend** (Simplest)
 ```rust
-#[allow(dead_code)]
-fn run_mlx_command(&self, args: &[&str]) -> MinervaResult<String> {
-    // Phase 9: Will run actual mlx-lm commands
-}
+// LlamaCppBackend can already load GGUF
+// Can it load HuggingFace safetensors?
+// Research what llama.cpp supports natively
+
+// If yes → Just improve llama_adapter.rs, don't create MlxBackend!
+// If no → Create lightweight HF loader
 ```
 
-**Design Decision 1: Server vs CLI Mode**
-
-**Option A: CLI Mode (Simpler)**
-```
-For each inference request:
-  1. Run: python3 -m mlx_lm generate --model <model> --prompt <text> --max-tokens 100
-  2. Parse JSON output
-  3. Return to user
-```
-Pros: Simple, no background server
-Cons: Slower (spawn process each time), resource intensive
-
-**Option B: Server Mode (Better)**
-```
-On load_model():
-  1. Spawn: python3 -m mlx_lm.server --model <model> --port 8001
-  2. Wait for server ready
-  3. Cache server process
-
-On generate():
-  1. POST http://localhost:8001/v1/completions
-  2. Stream response back
-
-On unload_model():
-  1. Terminate server process
-  2. Clean up
-```
-Pros: Faster (persistent server), lower latency
-Cons: More complex (process management)
-
-**Recommendation:** Start with Option B (Server Mode)
-- Matches LM Studio architecture
-- Better performance for multiple requests
-- Enables streaming integration later
-
-#### Evening: Design HTTP Client (1 hour)
-
-**What We Need:**
+**Option 2: Lightweight Rust HF Loader** (If needed)
 ```rust
-struct MlxServerClient {
-    base_url: String,      // http://localhost:8001
-    timeout: Duration,     // 30s
-}
+// Create RustInferenceBackend that:
+// 1. Loads safetensors files (pure Rust, no Python)
+// 2. Implements basic transformer inference
+// 3. Doesn't try to be feature-complete
+// 4. Focuses on common models (Llama, Mistral, Phi, etc.)
 
-impl MlxServerClient {
-    fn new(port: u16) -> Self { ... }
-    
-    async fn generate(&self, 
-        model: &str,
-        prompt: &str,
-        max_tokens: usize
-    ) -> MinervaResult<String> { ... }
-    
-    async fn is_ready(&self) -> bool { ... }
-}
+// Crates available:
+// - `safetensors` - Load HF model weights (MIT licensed!)
+// - `ndarray` - Tensor operations (already used)
+// - `nalgebra` - Linear algebra
+// - `burn` - Rust DL framework (but might be overkill)
 ```
 
-**HTTP Calls Required:**
-```
-GET http://localhost:8001/health          # Check if running
-POST http://localhost:8001/v1/completions # Generate text
-{
-  "model": "mistral-7b",
-  "prompt": "Hello world",
-  "max_tokens": 100,
-  "temperature": 0.7,
-  "top_p": 0.9
-}
-```
+**Recommendation:** Start with Option 1 (Extend llama.cpp support)
+- Less code to write
+- Proven, tested technology
+- Better performance
+- No new dependencies
 
-**Expected Response:**
-```json
-{
-  "id": "cmpl-xxx",
-  "object": "text_completion",
-  "created": 1234567890,
-  "model": "mistral-7b",
-  "choices": [{
-    "text": " this is the generated response",
-    "index": 0,
-    "logprobs": null,
-    "finish_reason": "length"
-  }],
-  "usage": {
-    "prompt_tokens": 2,
-    "completion_tokens": 8,
-    "total_tokens": 10
-  }
-}
+#### Evening: Plan Testing Strategy (1 hour)
+
+**Test Pure Rust Instead of Python:**
+```rust
+// No more:
+// - Installing Python
+// - Running subprocess commands
+// - Dealing with Python paths
+
+// Instead:
+// - Load model files directly
+// - Test with real model weights
+// - Benchmark vs llama.cpp
+// - Profile memory usage
 ```
-
-**Crates Needed:**
-- `reqwest` (HTTP client) - ✅ already in Cargo.toml
-- `tokio` (async runtime) - ✅ already in Cargo.toml
-- `serde_json` (JSON parsing) - ✅ already in Cargo.toml
-
-**No new dependencies needed!**
 
 ---
 
-### Day 2: Implementation
+### Day 2: Implementation (Pure Rust Only)
 
-#### Morning: Create HTTP Client Module (2 hours)
+**Strategy: Improve LlamaCppBackend Instead**
 
-**File:** `src-tauri/src/inference/mlx_http_client.rs` (new file, ~150 lines)
+Rather than creating new Python-calling infrastructure, enhance what we have:
 
 ```rust
-use reqwest::Client;
-use std::time::Duration;
-use crate::error::{MinervaError, MinervaResult};
+// APPROACH: Use llama.cpp for everything it can handle
+// - GGUF format: 100% supported
+// - HuggingFace safetensors: Research if llama.cpp can load
+// - Other formats: Convert to GGUF (user responsibility or auto-convert)
 
-pub struct MlxServerClient {
-    http_client: Client,
-    base_url: String,
-    timeout: Duration,
-}
+// If llama.cpp doesn't support format X:
+// - Don't spawn Python subprocess!
+// - Instead: Create light-weight pure Rust loader
 
-impl MlxServerClient {
-    pub fn new(port: u16) -> Self {
-        Self {
-            http_client: Client::new(),
-            base_url: format!("http://localhost:{}", port),
-            timeout: Duration::from_secs(30),
-        }
-    }
-
-    /// Check if mlx-lm server is ready
-    pub async fn is_ready(&self) -> bool {
-        self.http_client
-            .get(&format!("{}/health", self.base_url))
-            .timeout(self.timeout)
-            .send()
-            .await
-            .ok()
-            .map(|r| r.status().is_success())
-            .unwrap_or(false)
-    }
-
-    /// Generate text via mlx-lm API
-    pub async fn generate(
-        &self,
-        model: &str,
-        prompt: &str,
-        max_tokens: usize,
-        temperature: f32,
-        top_p: f32,
-    ) -> MinervaResult<String> {
-        let request_body = serde_json::json!({
-            "model": model,
-            "prompt": prompt,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "top_p": top_p,
-        });
-
-        let response = self.http_client
-            .post(&format!("{}/v1/completions", self.base_url))
-            .json(&request_body)
-            .timeout(self.timeout)
-            .send()
-            .await
-            .map_err(|e| MinervaError::InferenceError(
-                format!("MLX server request failed: {}", e)
-            ))?;
-
-        let json = response.json::<serde_json::Value>().await
-            .map_err(|e| MinervaError::InferenceError(
-                format!("Failed to parse MLX response: {}", e)
-            ))?;
-
-        // Extract text from response
-        json["choices"][0]["text"]
-            .as_str()
-            .ok_or_else(|| MinervaError::InferenceError(
-                "Invalid MLX response format".to_string()
-            ))
-            .map(|s| s.to_string())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_mlx_http_client_creation() {
-        let client = MlxServerClient::new(8001);
-        assert_eq!(client.base_url, "http://localhost:8001");
-    }
-
-    #[tokio::test]
-    async fn test_mlx_http_client_is_ready_false() {
-        // Server not running - should be false
-        let client = MlxServerClient::new(8001);
-        assert!(!client.is_ready().await);
-    }
-}
+// Key: All code stays in Rust. No external process calls.
 ```
 
-#### Afternoon: Update MlxBackend to Use HTTP Client (2 hours)
+#### Morning Option A: Research llama.cpp Capabilities (2 hours)
 
-**File:** `src-tauri/src/inference/mlx_backend.rs` (modify existing)
+Check what llama.cpp/llama-cpp-rs already supports:
+```bash
+# Questions to research:
+1. Can llama.cpp load safetensors directly?
+2. Can llama.cpp load HuggingFace .bin format?
+3. What's the complete list of supported formats?
+4. Are there Rust crates that already solve this?
+```
 
-**Changes:**
+**Likely findings:**
+- llama.cpp primarily supports GGUF
+- For other formats, users convert to GGUF first
+- This is actually the right approach (quantization matters!)
+
+**Implication:** Maybe MlxBackend can just wrap llama.cpp with format detection + auto-conversion guide?
+
+#### Morning Option B: Add Pure Rust Inference Layer (If Needed)
+
+If llama.cpp doesn't support needed formats, create lightweight Rust layer:
+
 ```rust
-use super::mlx_http_client::MlxServerClient;
-use std::process::{Child, Command};
+// New file: src-tauri/src/inference/pure_rust_inference.rs
 
-pub struct MlxBackend {
-    loaded_model: Arc<Mutex<Option<String>>>,
-    mlx_status: Arc<Mutex<MlxStatus>>,
-    server_process: Arc<Mutex<Option<Child>>>,  // NEW: Track server process
-    http_client: Arc<Mutex<Option<MlxServerClient>>>,  // NEW: HTTP client
-    n_threads: usize,
+// Use these crates (already in dependencies or add sparingly):
+use ndarray::Array2;  // Tensors (already in use)
+use serde_json;       // Config parsing
+
+// Minimal implementation:
+// 1. Load model weights from safetensors (pure Rust crate!)
+// 2. Implement forward pass for common architectures
+// 3. Focus on Llama, Mistral, Phi (90% of use cases)
+
+// Performance: Won't match llama.cpp, but:
+// - No external dependencies
+// - Pure Rust, fully controlled
+// - Good enough for basic inference
+// - Can be optimized later
+
+pub struct PureRustBackend {
+    weights: HashMap<String, ndarray::Array2<f32>>,
+    config: ModelConfig,
     n_ctx: usize,
 }
 
-impl MlxBackend {
-    pub fn new() -> Self {
-        Self {
-            loaded_model: Arc::new(Mutex::new(None)),
-            mlx_status: Arc::new(Mutex::new(MlxStatus::Unchecked)),
-            server_process: Arc::new(Mutex::new(None)),  // NEW
-            http_client: Arc::new(Mutex::new(None)),     // NEW
-            n_threads: num_cpus::get(),
-            n_ctx: 0,
-        }
-    }
-
-    /// Start mlx-lm server subprocess
-    fn start_server(&self, model_ref: &str) -> MinervaResult<Child> {
-        let output = Command::new("python3")
-            .arg("-m").arg("mlx_lm.server")
-            .arg("--model").arg(model_ref)
-            .arg("--port").arg("8001")
-            .spawn()
-            .map_err(|e| MinervaError::InferenceError(
-                format!("Failed to start mlx-lm server: {}", e)
-            ))?;
-
-        // Wait for server to be ready
-        std::thread::sleep(std::time::Duration::from_secs(2));
-        
-        Ok(output)
-    }
-
-    /// Stop mlx-lm server
-    fn stop_server(&self) -> MinervaResult<()> {
-        if let Some(mut child) = self.server_process.lock().unwrap().take() {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
-        Ok(())
-    }
-}
-
-impl InferenceBackend for MlxBackend {
-    fn load_model(&mut self, path: &Path, n_ctx: usize) -> MinervaResult<()> {
-        // Check mlx availability
-        // (existing code unchanged)
-        
-        let model_name = Self::extract_model_name(path);
-        let format = Self::detect_model_format(path);
-
-        // START SERVER
-        let server_process = self.start_server(&model_name)?;
-        *self.server_process.lock().unwrap() = Some(server_process);
-        
-        // Create HTTP client
-        let client = MlxServerClient::new(8001);
-        *self.http_client.lock().unwrap() = Some(client);
-        
-        *self.loaded_model.lock().unwrap() = Some(model_name.clone());
-        self.n_ctx = n_ctx;
-
-        tracing::info!("MLX server started for model: {}", model_name);
-        Ok(())
-    }
-
-    fn unload_model(&mut self) {
-        self.stop_server().ok();
-        *self.loaded_model.lock().unwrap() = None;
-        *self.http_client.lock().unwrap() = None;
-        self.n_ctx = 0;
-        tracing::info!("MLX server stopped");
-    }
-
+impl InferenceBackend for PureRustBackend {
     fn generate(&self, prompt: &str, params: GenerationParams) -> MinervaResult<String> {
-        let model = self.loaded_model.lock().unwrap();
-        let model_ref = model
-            .as_ref()
-            .ok_or_else(|| MinervaError::InferenceError("No model loaded".to_string()))?;
-
-        let client = self.http_client.lock().unwrap();
-        let http_client = client
-            .as_ref()
-            .ok_or_else(|| MinervaError::InferenceError("HTTP client not initialized".to_string()))?;
-
-        // Make HTTP request to mlx-lm server
-        let rt = tokio::runtime::Runtime::new()?;
-        rt.block_on(async {
-            http_client.generate(
-                model_ref,
-                prompt,
-                params.max_tokens,
-                params.temperature,
-                params.top_p,
-            ).await
-        })
+        // Tokenize input
+        let tokens = self.tokenize(prompt)?;
+        
+        // Run transformer forward pass
+        let mut output_tokens = Vec::new();
+        for _ in 0..params.max_tokens {
+            let logits = self.forward_pass(&tokens)?;
+            let next_token = self.sample_token(&logits, params.temperature)?;
+            output_tokens.push(next_token);
+            tokens.push(next_token);
+        }
+        
+        // Detokenize
+        self.detokenize(&output_tokens)
     }
-
-    // Other methods unchanged...
+    
+    fn forward_pass(&self, tokens: &[i32]) -> MinervaResult<Array2<f32>> {
+        // Simplified transformer implementation
+        // This is the hard part - but doable!
+    }
 }
 ```
+
+**Available Rust Crates for This:**
+- `safetensors` (0.3) - Load HF model files (MIT license!)
+- `ndarray` - Tensor operations
+- `burn` - Full ML framework (if we want it)
+- `tch-rs` - PyTorch bindings to libtorch (not Python!)
+
+#### Afternoon: Decision & Plan (1 hour)
+
+**Choose One Path:**
+
+**Path 1: RECOMMENDED - Just Use llama.cpp**
+- llama.cpp supports GGUF
+- Users should quantize to GGUF anyway
+- Simpler, faster, proven
+- Keep MlxBackend as optional enhancement for future
+- Cost: 0 development time, immediate value
+
+**Path 2: Add Pure Rust Inference**
+- Support more model formats natively
+- No external binary dependencies
+- Good learning opportunity
+- Cost: 3-5 days of focused development
+- Benefit: Future-proof, no subprocess calls
+
+**Path 3: Hybrid (Best)**
+- Keep llama.cpp as primary (90% of cases)
+- Add light Pure Rust backend as fallback
+- Users can choose via config
+- Gradual implementation: start with Path 1, add Path 2 later
+
+**Recommendation:** Path 3 - Start with Path 1 (immediate), plan Path 2 for Phase 9+
+
+---
+
+### Day 2 (Continued): Quick Proof of Concept
+
+If going with Path 1 (llama.cpp only):
+- Time: 1-2 hours maximum
+- Work: Update documentation to guide users
+- Result: Clear path for model format support
+
+If going with Path 3 (Hybrid):
+- Day 2: Implement llama.cpp format detection
+- Days 3-4: Add basic pure Rust inference scaffold
+- Goal: Prove both paths work together
 
 ---
 
 ### Day 3: Testing & Documentation
 
-#### Morning: Integration Tests (2 hours)
+#### Morning: Integration Tests (For your chosen path)
 
-**File:** `src-tauri/tests/integration/mlx_backend_integration.rs` (new file, ~250 lines)
+**If Path 1 (llama.cpp only) - File:** `src-tauri/tests/integration/format_detection_tests.rs` (new file, ~100 lines)
 
 ```rust
-use minerva_lib::inference::mlx_backend::MlxBackend;
+// NO PYTHON SUBPROCESS TESTS!
+// Only test what Rust can do directly
+
 use minerva_lib::inference::llama_adapter::{InferenceBackend, GenerationParams};
 use std::path::Path;
 
-/// Tests that run WITH mlx-lm installed
-/// These are marked #[ignore] and must be run with:
-/// cargo test mlx_backend_integration -- --ignored --test-threads=1
-
 #[test]
-#[ignore]
-fn test_mlx_backend_start_server() {
-    // Test: Can we start mlx-lm server?
-    let mut backend = MlxBackend::new();
-    
-    // This will start a real server if mlx-lm is installed
-    let result = backend.load_model(Path::new("mistral-7b"), 2048);
-    
-    match result {
-        Ok(_) => {
-            assert!(backend.is_loaded());
-            backend.unload_model();
-            // Server should be stopped
-        }
-        Err(e) => {
-            eprintln!("mlx-lm not available or failed: {}", e);
-            // This is OK in CI without mlx-lm
-        }
-    }
+fn test_format_detection_gguf() {
+    // Test: GGUF files go to llama.cpp backend
+    let path = Path::new("model.gguf");
+    let format = detect_format(path);
+    assert_eq!(format, Format::GGUF);
 }
 
 #[test]
-#[ignore]
-fn test_mlx_backend_generate_text() {
-    let mut backend = MlxBackend::new();
-    
-    if let Ok(_) = backend.load_model(Path::new("mistral-7b"), 2048) {
-        let params = GenerationParams {
-            max_tokens: 50,
-            temperature: 0.7,
-            top_p: 0.9,
-        };
-        
-        let result = backend.generate("Hello, world!", params);
-        
-        match result {
-            Ok(text) => {
-                assert!(!text.is_empty());
-                println!("Generated: {}", text);
-            }
-            Err(e) => eprintln!("Generation failed: {}", e),
-        }
-        
-        backend.unload_model();
-    }
+fn test_format_detection_safetensors() {
+    // Test: Safetensors go to pure Rust backend (if available)
+    let path = Path::new("model.safetensors");
+    let format = detect_format(path);
+    assert_eq!(format, Format::HuggingFaceSafetensors);
 }
 
 #[test]
-fn test_mlx_backend_http_client_creation() {
-    use minerva_lib::inference::mlx_http_client::MlxServerClient;
+fn test_backend_selection_based_on_format() {
+    // Test: Correct backend chosen based on format
+    let gguf_path = Path::new("model.gguf");
+    let backend = select_backend(gguf_path).unwrap();
+    // Should be LlamaCppBackend
     
-    let client = MlxServerClient::new(8001);
-    // Should not panic
-    assert_eq!(client.base_url, "http://localhost:8001");
+    let hf_path = Path::new("model.safetensors");
+    let backend = select_backend(hf_path).unwrap();
+    // Should be PureRustBackend (if available)
+    // or error with helpful message
 }
+```
+
+**If Path 3 (Hybrid) - Additional File:** `src-tauri/tests/integration/pure_rust_inference_tests.rs` (new file, ~150 lines)
+
+```rust
+// Tests for pure Rust inference path
+use minerva_lib::inference::pure_rust_inference::PureRustBackend;
+
+#[test]
+fn test_pure_rust_backend_creation() {
+    let backend = PureRustBackend::new();
+    assert!(!backend.is_loaded());
+}
+
+#[test]
+fn test_pure_rust_tokenization() {
+    // Test basic tokenization doesn't need model
+    let backend = PureRustBackend::new();
+    let tokens = backend.tokenize("hello world").unwrap();
+    assert!(!tokens.is_empty());
+}
+
+// Note: Full inference testing requires model files
+// Can add #[ignore] tests for optional testing with real models
 ```
 
 #### Afternoon: Update Documentation (1 hour)
@@ -492,64 +386,80 @@ git commit -m "feat(phase8-step3b): Implement MLX subprocess integration
 
 ---
 
-## Testing Strategy
+## Testing Strategy - Pure Rust Only
 
-### Unit Tests (No mlx-lm Required)
-- HTTP client creation
-- Base URL formatting
-- Request body construction
+### Unit Tests (No external dependencies!)
+- Format detection logic
+- Backend selection
+- Tokenization (basic)
 - Error handling
+- Model type identification
 
-### Integration Tests (Require mlx-lm)
+### All Tests Run in CI
+No special setup needed:
 ```bash
-# Run optional integration tests (requires mlx-lm)
-cargo test mlx_backend_integration -- --ignored --test-threads=1
+# Just run tests normally
+cargo test  # All tests run without external dependencies!
 
-# Run without (skip these tests)
-cargo test  # Will skip #[ignore] tests by default
+# No subprocess calls
+# No Python installation needed
+# No network dependencies
+# Pure Rust only
 ```
 
-All integration tests marked with:
+### Performance Tests (Optional)
 ```rust
-#[test]
-#[ignore]  // Only runs with: cargo test -- --ignored
-fn test_name() { ... }
+// Benchmark pure Rust inference vs llama.cpp
+#[bench]
+fn bench_pure_rust_inference(b: &mut Bencher) {
+    let backend = PureRustBackend::new();
+    // Load model...
+    b.iter(|| backend.generate("test prompt"))
+}
+
+#[bench]
+fn bench_llama_cpp_inference(b: &mut Bencher) {
+    let backend = LlamaCppBackend::new();
+    // Load model...
+    b.iter(|| backend.generate("test prompt"))
+}
 ```
 
 ---
 
 ## Error Cases to Handle
 
-### 1. MLX Server Won't Start
+### 1. Unsupported Model Format
 ```
-Error: "Failed to start mlx-lm server: ..."
-→ Return MinervaError::InferenceError
-→ User sees: "mlx-lm not installed or unavailable"
-→ Graceful fallback to llama.cpp backend
-```
-
-### 2. Server Timeout
-```
-Error: "MLX server request timed out (30s)"
-→ Return MinervaError::InferenceError
-→ Kill server process
-→ User can retry or switch backends
+Error: "Model format .xyz not supported"
+→ Return MinervaError::InvalidRequest
+→ User sees: "Use GGUF format or convert with: [instructions]"
+→ No subprocess call attempts
+→ Clear guidance on what to do
 ```
 
-### 3. Invalid Model Name
+### 2. Model File Corrupted
 ```
-Error: "Model 'invalid-model' not found on HuggingFace"
-→ Return MinervaError::ModelNotFound
-→ Stop server
-→ User sees clear error message
+Error: "Failed to load model weights from file"
+→ Return MinervaError::ModelLoadingError
+→ Provide context: "File may be corrupted or incomplete"
+→ Suggest re-download
 ```
 
-### 4. HTTP Connection Refused
+### 3. Insufficient Memory for Model
 ```
-Error: "Failed to connect to mlx-lm server at localhost:8001"
-→ Return MinervaError::InferenceError
-→ Check if server process crashed
-→ Attempt restart or fallback
+Error: "Model requires 8GB but only 4GB available"
+→ Return MinervaError::OutOfMemory
+→ Suggest: quantize model, or use llama.cpp
+→ No subprocess fallback - just fail gracefully
+```
+
+### 4. Invalid Tokenizer Configuration
+```
+Error: "Model config missing required fields"
+→ Return MinervaError::ModelLoadingError
+→ Provide helpful recovery: check model metadata
+→ No subprocess workaround - stay in Rust
 ```
 
 ---
@@ -558,11 +468,12 @@ Error: "Failed to connect to mlx-lm server at localhost:8001"
 
 | Metric | Target | Notes |
 |--------|--------|-------|
-| Server startup | <3s | Python import + model load |
-| First inference | <5s | HTTP request + mlx-lm generation |
-| Subsequent requests | <2s | Cached model + mlx-lm generation |
-| Memory overhead | <500MB | Python runtime + model weights |
-| Error recovery | <100ms | Timeout and fallback |
+| Format detection | <1ms | Pure Rust, instant |
+| Model load | <2s | llama.cpp or pure Rust |
+| First inference | <1s | Cached model ready |
+| Subsequent requests | <200ms | Direct inference, no subprocess |
+| Memory overhead | 0 | No external process |
+| Startup | Instant | No server to start |
 
 ---
 
@@ -620,19 +531,21 @@ Error: "Failed to connect to mlx-lm server at localhost:8001"
 
 ## References
 
-### MLX-LM Documentation
-- GitHub: https://github.com/ml-explore/mlx-examples/tree/main/llm
-- Installation: `pip install mlx-lm`
-- Server docs: `python3 -m mlx_lm.server --help`
+### Pure Rust Crates for Model Loading
+- `safetensors` - Load HuggingFace model weights (MIT licensed!)
+- `ndarray` - Tensor operations
+- `burn` - Full ML framework if needed
+- `tch-rs` - LibTorch bindings (not Python!)
 
-### LM Studio (Reference Implementation)
-- Uses same subprocess architecture
-- https://github.com/lmstudio-ai/lmstudio
-- Proven approach for managing multiple backends
+### llama.cpp Documentation
+- GitHub: https://github.com/ggerganov/llama.cpp
+- Rust bindings: `llama-cpp-rs` (already in use)
+- Docs: Extensive format support documentation
 
-### Reqwest (HTTP Client)
-- Already in dependencies
-- Examples: https://docs.rs/reqwest/latest/reqwest/
+### Model Format Conversion
+- GGUF is the gold standard (quantized, optimized)
+- Most models available in GGUF on HuggingFace
+- `llama.cpp` provides conversion tools
 
 ---
 
@@ -641,16 +554,24 @@ Error: "Failed to connect to mlx-lm server at localhost:8001"
 When ready to start Phase 8-Step 3b:
 
 ```bash
-# Install mlx-lm
-pip install mlx-lm
-
-# Verify installation
-python3 -m mlx_lm --help
-
 # Create new feature branch
-git checkout -b phase-8/mlx-subprocess
+git checkout -b phase-8/pure-rust-backends
 
-# Start implementing MlxServerClient...
+# Step 1: Research llama.cpp capabilities
+# - What formats does it support?
+# - Can we improve llama_adapter.rs?
+
+# Step 2: Decide Path (1, 2, or 3)
+# - Path 1: Just use llama.cpp (quickest)
+# - Path 2: Pure Rust inference (ambitious)
+# - Path 3: Hybrid (recommended)
+
+# Step 3: Implement chosen approach
+# - NO subprocess calls
+# - All code stays in Rust
+# - Tests run without external dependencies
+
+# Start by improving llama_adapter.rs...
 ```
 
 ---
