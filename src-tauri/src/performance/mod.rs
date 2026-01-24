@@ -6,6 +6,7 @@
 /// - Memory-aware inference configuration
 /// - UI responsiveness optimization
 pub mod adaptive;
+pub mod adaptive_config;
 pub mod execution_modes;
 pub mod inference_metrics;
 pub mod inference_metrics_query;
