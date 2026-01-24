@@ -48,6 +48,8 @@ rayon = "1.7"
 async-trait = "0.1"
 dashmap = "5.5"
 rand = "0.8"
+safetensors = "0.4"
+ndarray = "0.15"
 
 [[bench]]
 name = "batch_processing_benchmarks"
