@@ -27,8 +27,11 @@ pub mod performance_metrics; // Performance tracking and benchmarking
 // Phase 11: REST API Decoupling & Headless Server
 pub mod api_protocol; // API protocol validation and standardization
 pub mod api_response_format; // API response format and OpenAI compatibility
+pub mod config_management; // Configuration loading and validation
 pub mod headless_server; // Headless server and Tauri decoupling
 pub mod http_api; // HTTP API endpoints and contracts
+pub mod streaming_handlers; // Streaming handler integration
+pub mod streaming_responses; // Streaming response handling and SSE
 
 use std::fs;
 use std::path::{Path, PathBuf};
