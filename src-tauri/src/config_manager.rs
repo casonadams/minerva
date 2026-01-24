@@ -5,9 +5,10 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 /// Configuration source priority (higher = more important)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum ConfigSource {
     /// Default configuration
+    #[default]
     Default = 0,
     /// Configuration file (.toml, .json, .yaml)
     File = 1,
@@ -15,12 +16,6 @@ pub enum ConfigSource {
     Environment = 2,
     /// Command-line arguments
     CommandLine = 3,
-}
-
-impl Default for ConfigSource {
-    fn default() -> Self {
-        Self::Default
-    }
 }
 
 /// Server configuration

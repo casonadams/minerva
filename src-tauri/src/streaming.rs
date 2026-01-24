@@ -1,8 +1,6 @@
 //! Streaming Response Support
 //! Handles SSE (Server-Sent Events) and streaming responses for token generation
 
-use axum::response::sse::{Event, KeepAlive, Sse};
-use futures::stream::{self, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 
 /// Streaming response format (SSE)

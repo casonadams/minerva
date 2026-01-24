@@ -287,7 +287,7 @@ fn test_streaming_event_openai_format_compatibility() {
 #[test]
 fn test_streaming_multiple_tokens_sequence() {
     // Simulate streaming multiple tokens
-    let tokens = vec!["Hello", " ", "world", "!"];
+    let tokens = ["Hello", " ", "world", "!"];
     let mut events = Vec::new();
 
     for (idx, token) in tokens.iter().enumerate() {
