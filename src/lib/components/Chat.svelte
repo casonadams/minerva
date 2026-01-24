@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { invoke } from '@tauri-apps/api/core';
+	import { chat, models } from '../api/endpoints';
 	import { chatState, addMessage, setLoading, type ChatMessage } from '../stores';
 	import Messages from './Messages.svelte';
 	import ModelSelector from './ModelSelector.svelte';
@@ -15,8 +15,9 @@
 
 	async function loadModels() {
 		try {
-			const models = await invoke<string[]>('list_hf_models', { query: '' });
-			chatState.update((s) => ({ ...s, loadedModels: models }));
+			const response = await models.list();
+			const modelIds = response.data.map((m) => m.id);
+			chatState.update((s) => ({ ...s, loadedModels: modelIds }));
 		} catch (err) {
 			console.error('Failed to load models:', err);
 		}
@@ -33,21 +34,22 @@
 			timestamp: Date.now(),
 		};
 		addMessage(userMsg);
+		const message = inputValue;
 		inputValue = '';
 		scrollToBottom();
 
 		setLoading(true);
 		try {
-			const response = await invoke<string>('infer_prompt', {
+			const response = await chat.completions({
 				model: state.selectedModel,
-				prompt: inputValue,
+				messages: [{ role: 'user', content: message }],
 				max_tokens: 256,
 			});
 
 			const assistantMsg: ChatMessage = {
 				id: crypto.randomUUID(),
 				role: 'assistant',
-				content: response,
+				content: response.choices[0]?.message.content || 'No response',
 				timestamp: Date.now(),
 			};
 			addMessage(assistantMsg);
@@ -56,7 +58,7 @@
 			addMessage({
 				id: crypto.randomUUID(),
 				role: 'assistant',
-				content: `Error: ${err}`,
+				content: `Error: ${err instanceof Error ? err.message : String(err)}`,
 				timestamp: Date.now(),
 			});
 			scrollToBottom();

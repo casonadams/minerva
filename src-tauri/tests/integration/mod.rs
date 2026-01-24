@@ -24,6 +24,9 @@ pub mod batch_processing; // Batch processing for tokenization and inference
 // Phase 6 & 7: Performance and Observability
 pub mod performance_metrics; // Performance tracking and benchmarking
 
+// Phase 11: REST API Decoupling & Headless Server
+pub mod http_api; // HTTP API endpoints and contracts
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;

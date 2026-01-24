@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { invoke } from '@tauri-apps/api/core';
+	import { models } from '../api/endpoints';
 	import { chatState, setLoadedModels, setSelectedModel } from '../stores';
 
 	interface Props {
@@ -23,17 +23,14 @@
 		downloadProgress = 0;
 
 		try {
-			await invoke('download_model', {
-				model_id: modelId,
-				local_dir: `./models/${modelId.split('/')[1]}`,
-			});
+			await models.download(modelId);
 
-			const models = [...$chatState.loadedModels, modelId];
-			setLoadedModels(models);
+			const modelList = [...$chatState.loadedModels, modelId];
+			setLoadedModels(modelList);
 			setSelectedModel(modelId);
 			onClose();
 		} catch (err) {
-			alert(`Failed: ${err}`);
+			alert(`Failed: ${err instanceof Error ? err.message : String(err)}`);
 		} finally {
 			isDownloading = false;
 			downloadProgress = null;
