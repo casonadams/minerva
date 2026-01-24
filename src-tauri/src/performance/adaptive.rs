@@ -1,3 +1,5 @@
+use super::execution_modes::ExecutionMode;
+use super::window_state::WindowState;
 use parking_lot::RwLock;
 /// Adaptive Performance Configuration
 ///
@@ -7,30 +9,6 @@ use parking_lot::RwLock;
 /// - Model precision selection (FP32 vs INT8 quantization)
 /// - Background/Foreground optimization
 use std::sync::Arc;
-
-/// Execution mode preference
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ExecutionMode {
-    /// Prioritize accuracy and quality
-    HighQuality,
-    /// Balance quality and speed
-    Balanced,
-    /// Prioritize speed and responsiveness
-    HighPerformance,
-    /// Minimal resource usage (mobile/low-end)
-    PowerSaver,
-}
-
-/// Window focus state
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WindowState {
-    /// Window is in foreground, user actively using app
-    Foreground,
-    /// Window is in background
-    Background,
-    /// Window is minimized
-    Minimized,
-}
 
 /// Adaptive performance configuration
 #[derive(Debug, Clone, Copy)]
@@ -62,55 +40,12 @@ impl Default for AdaptiveConfig {
 impl AdaptiveConfig {
     /// Get config for execution mode
     pub fn for_mode(mode: ExecutionMode) -> Self {
-        match mode {
-            ExecutionMode::HighQuality => Self {
-                use_gpu: true,
-                batch_size: 32,
-                use_quantized: false,
-                max_concurrent: 4,
-                enable_prefetch: true,
-            },
-            ExecutionMode::Balanced => Self {
-                use_gpu: true,
-                batch_size: 16,
-                use_quantized: false,
-                max_concurrent: 4,
-                enable_prefetch: true,
-            },
-            ExecutionMode::HighPerformance => Self {
-                use_gpu: true,
-                batch_size: 8,
-                use_quantized: true,
-                max_concurrent: 2,
-                enable_prefetch: false,
-            },
-            ExecutionMode::PowerSaver => Self {
-                use_gpu: false,
-                batch_size: 4,
-                use_quantized: true,
-                max_concurrent: 1,
-                enable_prefetch: false,
-            },
-        }
+        mode.to_config()
     }
 
     /// Adjust for window state
     pub fn for_window_state(self, state: WindowState) -> Self {
-        match state {
-            WindowState::Foreground => self,
-            WindowState::Background => Self {
-                max_concurrent: self.max_concurrent.max(1) - 1,
-                enable_prefetch: false,
-                ..self
-            },
-            WindowState::Minimized => Self {
-                use_gpu: false,
-                batch_size: 1,
-                max_concurrent: 1,
-                enable_prefetch: false,
-                ..self
-            },
-        }
+        state.adjust_config(self)
     }
 }
 
