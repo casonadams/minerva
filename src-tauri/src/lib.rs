@@ -1,8 +1,7 @@
-pub mod api_protocol;
+pub mod api;
 pub mod cli;
 pub mod commands;
 pub mod config;
-pub mod config_manager;
 pub mod error;
 pub mod error_recovery;
 pub mod inference;

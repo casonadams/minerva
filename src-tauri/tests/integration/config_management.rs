@@ -1,6 +1,6 @@
 // Configuration Management Tests
 
-use minerva_lib::config_manager::{
+use minerva_lib::config::{
     ApiConfig, ApplicationConfig, ConfigSource, ConfigValidator, ServerConfig, StreamingConfigEntry,
 };
 

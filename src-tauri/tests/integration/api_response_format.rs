@@ -1,6 +1,6 @@
 // API Response Format Tests - Verify OpenAI-compatible response structure
 
-use minerva_lib::api_protocol::{ApiError, ApiErrorResponse, ApiResponse};
+use minerva_lib::api::{ApiError, ApiErrorResponse, ApiResponse};
 
 #[test]
 fn test_api_response_serialization() {

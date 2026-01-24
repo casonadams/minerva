@@ -1,6 +1,6 @@
 // API Protocol Unification Tests - OpenAI compatibility and response standardization
 
-use minerva_lib::api_protocol::{ApiError, ApiResponse, ProtocolValidator};
+use minerva_lib::api::{ApiError, ApiResponse, ProtocolValidator};
 
 #[test]
 fn test_protocol_validator_model_id_valid() {
