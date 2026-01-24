@@ -1,8 +1,8 @@
 use axum::{
     Json, Router,
-    extract::{Path, State},
-    http::StatusCode,
-    response::{IntoResponse, Response},
+    extract::Path,
+    extract::State,
+    response::{IntoResponse, Response, sse::KeepAlive, Sse},
     routing::{delete, get, post},
 };
 use serde::{Deserialize, Serialize};
@@ -10,12 +10,13 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 use uuid::Uuid;
+use futures::stream;
 
 use crate::error::{MinervaError, MinervaResult};
 #[allow(unused_imports)]
 use crate::models::{
     ChatCompletionRequest, ChatCompletionResponse, ChatMessage, Choice, ModelInfo, ModelRegistry,
-    ModelsListResponse, Usage,
+    ModelsListResponse, Usage, ChatCompletionChunk,
 };
 use crate::observability::{
     endpoints::{HealthEndpointResponse, ReadinessResponse, MetricsResponse, RequestMetrics, ResponseTimeMetrics, ErrorMetrics, CacheMetrics},
@@ -245,8 +246,56 @@ fn estimate_tokens(text: &str) -> usize {
     (text.len() / 4).max(1)
 }
 
-fn create_streaming_response(_req: ChatCompletionRequest) -> impl IntoResponse {
-    (StatusCode::OK, "streaming not yet implemented")
+fn create_streaming_response(req: ChatCompletionRequest) -> impl IntoResponse {
+    let completion_id = format!("chatcmpl-{}", Uuid::new_v4());
+    let created = chrono::Utc::now().timestamp();
+    let model = req.model.clone();
+
+    // Build prompt from messages
+    let prompt = build_chat_prompt(&req.messages);
+
+    // Generate mock response (in Phase 9, will use real inference)
+    let response_content = format!(
+        "Minerva inference response to: \"{}\" - Mock streaming response for testing",
+        prompt.chars().take(50).collect::<String>()
+    );
+
+    // Split into tokens (words for now, real tokenization in Phase 9)
+    let tokens: Vec<String> = response_content
+        .split_whitespace()
+        .map(|w| format!("{} ", w))
+        .collect();
+
+    // Create stream of tokens
+    let token_count = tokens.len();
+    let streaming_chunks: Vec<_> = tokens
+        .into_iter()
+        .enumerate()
+        .map(|(idx, token)| {
+            let is_first = idx == 0;
+            let is_last = idx == token_count - 1;
+            
+            let chunk = ChatCompletionChunk {
+                id: completion_id.clone(),
+                object: "chat.completion.chunk".to_string(),
+                created,
+                model: model.clone(),
+                choices: vec![crate::models::ChoiceDelta {
+                    index: 0,
+                    delta: crate::models::DeltaMessage {
+                        role: if is_first { Some("assistant".to_string()) } else { None },
+                        content: Some(token),
+                    },
+                    finish_reason: if is_last { Some("stop".to_string()) } else { None },
+                }],
+            };
+            
+            Ok::<_, String>(axum::response::sse::Event::default().json_data(chunk).unwrap())
+        })
+        .collect();
+
+    let stream = stream::iter(streaming_chunks);
+    Sse::new(stream).keep_alive(KeepAlive::default())
 }
 
 /// Load a model into memory
