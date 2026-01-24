@@ -7,9 +7,11 @@
 /// - UI responsiveness optimization
 pub mod adaptive;
 pub mod execution_modes;
+pub mod inference_metrics_query;
 pub mod integration;
 pub mod metrics_analyzer_integration;
 pub mod metrics_queries;
+pub mod metrics_storage;
 pub mod performance_metrics;
 pub mod profile_analyzer;
 pub mod profiler;
