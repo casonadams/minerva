@@ -15,10 +15,13 @@ too-many-arguments-threshold = 3
 # COMPLEXITY THRESHOLDS (Keep functions simple and understandable)
 # =============================================================================
 
-# Cognitive complexity per function (default: 25, we're stricter at 20)
+# Cognitive complexity per function (default: 25, we're stricter at 15)
 # Measures how hard a function is to understand
 # Lower = simpler = easier to test and maintain
-cognitive-complexity-threshold = 20
+# NOTE: This is cognitive complexity, not cyclomatic complexity
+# Cognitive is more nuanced and maps approximately to cyclomatic ÷ 2
+# So threshold of 15 roughly enforces cyclomatic ≤ 6 (we aim for ≤ 3)
+cognitive-complexity-threshold = 15
 
 # Type complexity threshold (avoid overly complex types)
 # Prevents type-level obfuscation and makes code more readable
@@ -120,8 +123,9 @@ await-holding-invalid-types = [
 # Function Size (≤ 25 lines):
 #   ✓ Enforced via review, not lint (use clippy-too-many-lines in future)
 #
-# File Size (≤ 100 lines):
-#   ✓ Enforced via review and organization
+# File Size (≤ 150 lines):
+#   ✓ Enforced via CI script (see scripts/check-file-lengths.sh)
+#   ✓ Run: ./scripts/check-file-lengths.sh
 #
 # Testing:
 #   ✓ allow-expect-in-tests = true (allows panic assertions)

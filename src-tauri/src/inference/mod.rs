@@ -4,6 +4,8 @@ pub mod transformer_layers;
 pub mod transformer_components;
 pub mod inference_engine;
 pub mod sampling;
+pub mod api;
+pub mod model_downloader;
 pub mod model_loader;
 pub mod mlx_model_support;
 pub mod unified_backend;
