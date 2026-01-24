@@ -1,4 +1,4 @@
-use super::integration::InferenceMetrics;
+use super::inference_metrics::InferenceMetrics;
 
 /// Query interface for inference metrics data
 pub struct InferenceMetricsQuery;

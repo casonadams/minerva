@@ -1,62 +1,15 @@
+pub use super::inference_metrics::InferenceMetrics;
+pub use super::operation_context::OperationContext;
+
 use super::inference_metrics_query::InferenceMetricsQuery;
 use super::metrics_storage::MetricsStorage;
-/// Performance Integration with Server
+
+/// Performance metrics aggregator for server
 ///
 /// Connects performance metrics to HTTP server observability:
 /// - Inference metrics collection
 /// - Server request tracking
 /// - Performance dashboard data
-use std::time::Instant;
-
-/// Inference operation metrics
-#[derive(Debug, Clone)]
-pub struct InferenceMetrics {
-    /// Model name being used
-    pub model: String,
-    /// Tokens generated
-    pub tokens_generated: u64,
-    /// Total duration in milliseconds
-    pub duration_ms: u64,
-    /// Tokens per second
-    pub tokens_per_second: f64,
-    /// GPU used
-    pub used_gpu: bool,
-}
-
-/// Server operation context for tracking
-#[derive(Debug, Clone)]
-pub struct OperationContext {
-    /// Operation start time
-    pub start_time: Instant,
-    /// Operation name
-    pub operation: String,
-    /// Model being used
-    pub model: Option<String>,
-}
-
-impl OperationContext {
-    /// Create new operation context
-    pub fn new(operation: &str) -> Self {
-        Self {
-            start_time: Instant::now(),
-            operation: operation.to_string(),
-            model: None,
-        }
-    }
-
-    /// Set model name
-    pub fn with_model(mut self, model: &str) -> Self {
-        self.model = Some(model.to_string());
-        self
-    }
-
-    /// Get elapsed time in milliseconds
-    pub fn elapsed_ms(&self) -> u64 {
-        self.start_time.elapsed().as_millis() as u64
-    }
-}
-
-/// Performance metrics aggregator for server
 pub struct ServerMetricsAggregator {
     storage: MetricsStorage,
 }
@@ -120,38 +73,6 @@ impl Default for ServerMetricsAggregator {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_operation_context_creation() {
-        let ctx = OperationContext::new("inference");
-        assert_eq!(ctx.operation, "inference");
-        assert!(ctx.model.is_none());
-    }
-
-    #[test]
-    fn test_operation_context_with_model() {
-        let ctx = OperationContext::new("inference").with_model("mistral");
-        assert_eq!(ctx.model, Some("mistral".to_string()));
-    }
-
-    #[test]
-    fn test_operation_context_elapsed() {
-        let ctx = OperationContext::new("test");
-        std::thread::sleep(std::time::Duration::from_millis(10));
-        assert!(ctx.elapsed_ms() >= 10);
-    }
-
-    #[test]
-    fn test_inference_metrics() {
-        let metrics = InferenceMetrics {
-            model: "test".to_string(),
-            tokens_generated: 100,
-            duration_ms: 1000,
-            tokens_per_second: 100.0,
-            used_gpu: true,
-        };
-        assert_eq!(metrics.tokens_per_second, 100.0);
-    }
 
     #[test]
     fn test_metrics_aggregator_creation() {
