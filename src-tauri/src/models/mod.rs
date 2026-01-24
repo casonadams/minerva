@@ -1,3 +1,4 @@
+pub mod binary_reader;
 pub mod chat_types;
 pub mod data_type_conversion;
 pub mod gguf_data_type;
