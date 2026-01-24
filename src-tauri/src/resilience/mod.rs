@@ -17,6 +17,9 @@ pub mod retry;
 pub mod retry_config;
 pub mod retry_state;
 pub mod timeout;
+pub mod timeout_context;
+pub mod timeout_manager;
+pub mod timeout_stats;
 
 use crate::error::MinervaError;
 use std::time::Duration;
