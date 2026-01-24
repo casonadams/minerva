@@ -221,6 +221,7 @@ mod tests {
 
     #[test]
     fn test_model_registry_add_and_retrieve() {
+        use crate::models::ModelInfo;
         let mut registry = ModelRegistry::new();
         let model = ModelInfo {
             id: "test-model".to_string(),

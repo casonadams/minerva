@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 /// Token bucket for rate limiting
 #[derive(Clone)]
