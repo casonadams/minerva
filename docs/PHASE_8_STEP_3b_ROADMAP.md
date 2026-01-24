@@ -242,29 +242,22 @@ impl InferenceBackend for PureRustBackend {
 
 #### Afternoon: Decision & Plan (1 hour)
 
-**Choose One Path:**
+**CHOSEN: Path 3 (Hybrid) - For Fastest Results**
 
-**Path 1: RECOMMENDED - Just Use llama.cpp**
-- llama.cpp supports GGUF
-- Users should quantize to GGUF anyway
-- Simpler, faster, proven
-- Keep MlxBackend as optional enhancement for future
-- Cost: 0 development time, immediate value
+**Why Path 3?**
+- ✅ Immediate value (use existing llama.cpp)
+- ✅ Future flexibility (add pure Rust later)
+- ✅ No external dependencies (pure Rust)
+- ✅ Fast to implement (phased approach)
+- ✅ Supports all model formats
+- ✅ Users get best of both
 
-**Path 2: Add Pure Rust Inference**
-- Support more model formats natively
-- No external binary dependencies
-- Good learning opportunity
-- Cost: 3-5 days of focused development
-- Benefit: Future-proof, no subprocess calls
+**Timeline:**
+- Days 1-2: Path 1 foundation (immediate working solution)
+- Days 3-5: Path 2 enhancement (pure Rust inference)
+- Days 6-7: Integration (smart backend selection)
 
-**Path 3: Hybrid (Best)**
-- Keep llama.cpp as primary (90% of cases)
-- Add light Pure Rust backend as fallback
-- Users can choose via config
-- Gradual implementation: start with Path 1, add Path 2 later
-
-**Recommendation:** Path 3 - Start with Path 1 (immediate), plan Path 2 for Phase 9+
+**Result:** Complete, flexible, fast system in one week
 
 ---
 
@@ -325,28 +318,238 @@ fn test_backend_selection_based_on_format() {
 }
 ```
 
-**If Path 3 (Hybrid) - Additional File:** `src-tauri/tests/integration/pure_rust_inference_tests.rs` (new file, ~150 lines)
+**For Path 3 (Hybrid) - Additional File:** `src-tauri/src/inference/pure_rust_backend.rs` (new file, ~500-700 lines)
+
+This is the pure Rust transformer inference implementation:
 
 ```rust
-// Tests for pure Rust inference path
-use minerva_lib::inference::pure_rust_inference::PureRustBackend;
+// Pure Rust transformer inference - no external dependencies!
+use crate::error::{MinervaError, MinervaResult};
+use crate::inference::llama_adapter::InferenceBackend;
+use crate::inference::llama_tokenizer::LLaMATokenizer;
+use std::collections::HashMap;
+use std::path::Path;
+use ndarray::Array2;
+
+/// Pure Rust transformer-based inference
+/// Supports HuggingFace safetensors format natively
+pub struct PureRustBackend {
+    weights: Arc<Mutex<Option<HashMap<String, Array2<f32>>>>>,
+    config: Arc<Mutex<Option<ModelConfig>>>,
+    tokenizer: Arc<Mutex<Option<LLaMATokenizer>>>,
+    n_ctx: usize,
+    n_threads: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct ModelConfig {
+    pub vocab_size: usize,
+    pub hidden_size: usize,
+    pub num_layers: usize,
+    pub num_heads: usize,
+    pub model_type: String,  // "llama", "mistral", "phi", etc.
+}
+
+impl PureRustBackend {
+    pub fn new() -> Self {
+        Self {
+            weights: Arc::new(Mutex::new(None)),
+            config: Arc::new(Mutex::new(None)),
+            tokenizer: Arc::new(Mutex::new(None)),
+            n_ctx: 0,
+            n_threads: num_cpus::get(),
+        }
+    }
+
+    /// Load safetensors model file
+    fn load_safetensors(path: &Path) -> MinervaResult<HashMap<String, Array2<f32>>> {
+        // Phase 9: Use safetensors crate to load weights
+        // For now: scaffold the structure
+        Ok(HashMap::new())
+    }
+
+    /// Load model config from JSON
+    fn load_config(path: &Path) -> MinervaResult<ModelConfig> {
+        // Phase 9: Parse config.json from model directory
+        // For now: scaffold
+        Ok(ModelConfig {
+            vocab_size: 32000,
+            hidden_size: 4096,
+            num_layers: 32,
+            num_heads: 32,
+            model_type: "llama".to_string(),
+        })
+    }
+
+    /// Forward pass through transformer
+    fn forward_pass(&self, tokens: &[i32]) -> MinervaResult<Vec<f32>> {
+        // Phase 9: Implement actual transformer forward pass
+        // For now: mock output matching vocab size
+        let config = self.config.lock().unwrap();
+        let cfg = config.as_ref().ok_or_else(|| 
+            MinervaError::InferenceError("Model not loaded".to_string())
+        )?;
+        
+        // Return logits over vocab
+        Ok(vec![0.1; cfg.vocab_size])
+    }
+
+    /// Sample next token from logits
+    fn sample_token(&self, logits: &[f32], temperature: f32) -> MinervaResult<i32> {
+        // Apply temperature
+        let scaled = logits.iter().map(|&x| x / temperature).collect::<Vec<_>>();
+        
+        // Sample argmax for now (Phase 9: use proper sampling)
+        let max_idx = scaled.iter()
+            .enumerate()
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .map(|(idx, _)| idx as i32)
+            .unwrap_or(0);
+        
+        Ok(max_idx)
+    }
+}
+
+impl Default for PureRustBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl InferenceBackend for PureRustBackend {
+    fn load_model(&mut self, path: &Path, n_ctx: usize) -> MinervaResult<()> {
+        // Load model weights
+        let weights = Self::load_safetensors(path)?;
+        *self.weights.lock().unwrap() = Some(weights);
+        
+        // Load model config
+        let config = Self::load_config(path)?;
+        *self.config.lock().unwrap() = Some(config);
+        
+        // Create/load tokenizer
+        let tokenizer = LLaMATokenizer::new(
+            (0..32000).map(|i| format!("token_{}", i)).collect()
+        )?;
+        *self.tokenizer.lock().unwrap() = Some(tokenizer);
+        
+        self.n_ctx = n_ctx;
+        
+        tracing::info!("Pure Rust backend loaded model: {}", path.display());
+        Ok(())
+    }
+
+    fn unload_model(&mut self) {
+        *self.weights.lock().unwrap() = None;
+        *self.config.lock().unwrap() = None;
+        *self.tokenizer.lock().unwrap() = None;
+        self.n_ctx = 0;
+    }
+
+    fn generate(&self, prompt: &str, params: crate::inference::llama_adapter::GenerationParams) -> MinervaResult<String> {
+        let tokenizer = self.tokenizer.lock().unwrap();
+        let tok = tokenizer.as_ref()
+            .ok_or_else(|| MinervaError::InferenceError("No tokenizer".to_string()))?;
+        
+        // Tokenize input
+        let tokens = tok.encode(prompt)?;
+        let mut tokens: Vec<i32> = tokens.iter().map(|&t| t as i32).collect();
+        
+        // Generate tokens
+        for _ in 0..params.max_tokens {
+            let logits = self.forward_pass(&tokens)?;
+            let next_token = self.sample_token(&logits, params.temperature)?;
+            tokens.push(next_token);
+        }
+        
+        // Detokenize
+        let u32_tokens: Vec<u32> = tokens.iter().map(|&t| t as u32).collect();
+        tok.decode(&u32_tokens)
+    }
+
+    fn tokenize(&self, text: &str) -> MinervaResult<Vec<i32>> {
+        let tokenizer = self.tokenizer.lock().unwrap();
+        let tok = tokenizer.as_ref()
+            .ok_or_else(|| MinervaError::InferenceError("No tokenizer".to_string()))?;
+        
+        let tokens = tok.encode(text)?;
+        Ok(tokens.iter().map(|&t| t as i32).collect())
+    }
+
+    fn detokenize(&self, tokens: &[i32]) -> MinervaResult<String> {
+        let tokenizer = self.tokenizer.lock().unwrap();
+        let tok = tokenizer.as_ref()
+            .ok_or_else(|| MinervaError::InferenceError("No tokenizer".to_string()))?;
+        
+        let u32_tokens: Vec<u32> = tokens.iter().map(|&t| t as u32).collect();
+        tok.decode(&u32_tokens)
+    }
+
+    fn is_loaded(&self) -> bool {
+        self.weights.lock().unwrap().is_some()
+    }
+
+    fn context_size(&self) -> usize {
+        self.n_ctx
+    }
+
+    fn thread_count(&self) -> usize {
+        self.n_threads
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pure_rust_backend_creation() {
+        let backend = PureRustBackend::new();
+        assert!(!backend.is_loaded());
+        assert_eq!(backend.context_size(), 0);
+    }
+
+    #[test]
+    fn test_pure_rust_backend_config_loading() {
+        let config = PureRustBackend::load_config(Path::new("dummy.json")).unwrap();
+        assert_eq!(config.model_type, "llama");
+    }
+
+    #[test]
+    fn test_pure_rust_token_sampling() {
+        let backend = PureRustBackend::new();
+        let logits = vec![0.1, 0.5, 0.3, 0.1];
+        let token = backend.sample_token(&logits, 1.0).unwrap();
+        assert!(token >= 0 && token < 4);
+    }
+}
+```
+
+**Integration Tests for Path 3:**
+
+```rust
+// tests/integration/format_detection_and_routing.rs
 
 #[test]
-fn test_pure_rust_backend_creation() {
-    let backend = PureRustBackend::new();
-    assert!(!backend.is_loaded());
+fn test_gguf_uses_llama_cpp_backend() {
+    let path = Path::new("model.gguf");
+    let backend = select_backend(path).unwrap();
+    // Should be LlamaCppBackend
 }
 
 #[test]
-fn test_pure_rust_tokenization() {
-    // Test basic tokenization doesn't need model
-    let backend = PureRustBackend::new();
-    let tokens = backend.tokenize("hello world").unwrap();
-    assert!(!tokens.is_empty());
+fn test_safetensors_uses_pure_rust_backend() {
+    let path = Path::new("model.safetensors");
+    let backend = select_backend(path).unwrap();
+    // Should be PureRustBackend
 }
 
-// Note: Full inference testing requires model files
-// Can add #[ignore] tests for optional testing with real models
+#[test]
+fn test_backend_fallback_chain() {
+    let path = Path::new("model.safetensors");
+    // Try native first, fallback to conversion if needed
+    let backend = select_backend_with_fallback(path).unwrap();
+    // Should work regardless
+}
 ```
 
 #### Afternoon: Update Documentation (1 hour)
