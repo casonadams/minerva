@@ -105,6 +105,28 @@ impl LlamaCppBackend {
         *self.tokenizer.lock().unwrap() = Some(tokenizer);
     }
 
+    /// Detect model format from file path
+    /// Returns the file extension as a format identifier
+    pub fn detect_format(path: &Path) -> &'static str {
+        path.extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| match ext.to_lowercase().as_str() {
+                "gguf" => "gguf",
+                "safetensors" => "safetensors",
+                "bin" => "huggingface",
+                "pt" => "pytorch",
+                "pb" => "tensorflow",
+                _ => "unknown",
+            })
+            .unwrap_or("unknown")
+    }
+
+    /// Check if this backend can handle the model format
+    /// llama.cpp backend only supports GGUF format
+    pub fn can_handle(path: &Path) -> bool {
+        matches!(Self::detect_format(path), "gguf")
+    }
+
     /// Create a fallback tokenizer from common vocabulary
     #[allow(dead_code)]
     fn create_fallback_tokenizer() -> LLaMATokenizer {
@@ -138,10 +160,29 @@ impl Default for LlamaCppBackend {
 
 impl InferenceBackend for LlamaCppBackend {
     fn load_model(&mut self, path: &Path, n_ctx: usize) -> MinervaResult<()> {
+        // Validate path exists
         if !path.exists() {
             return Err(MinervaError::ModelNotFound(format!(
                 "Model file not found: {}",
                 path.display()
+            )));
+        }
+
+        // Check file format - give helpful error if not GGUF
+        let format = Self::detect_format(path);
+        if format != "gguf" {
+            let guidance = match format {
+                "safetensors" | "huggingface" => {
+                    " (HuggingFace format detected - use pure Rust backend or convert to GGUF)"
+                }
+                "pytorch" | "tensorflow" => {
+                    " (PyTorch/TensorFlow format detected - convert to GGUF first)"
+                }
+                _ => " (unsupported format - convert to GGUF)",
+            };
+            return Err(MinervaError::InvalidRequest(format!(
+                "llama.cpp backend only supports GGUF format, got: {}{}",
+                format, guidance
             )));
         }
 
@@ -152,14 +193,15 @@ impl InferenceBackend for LlamaCppBackend {
             ..Default::default()
         };
 
-        let model = LlamaModel::load_from_file(path, params)
-            .map_err(|e| MinervaError::ModelLoadingError(format!("{:?}", e)))?;
+        let model = LlamaModel::load_from_file(path, params).map_err(|e| {
+            let err_msg = format!("{:?}", e);
+            MinervaError::ModelLoadingError(err_msg)
+        })?;
 
         // Create session for inference
         let session_params = SessionParams::default();
-        // Session params handles context size via the session itself
         let session = model.create_session(session_params).map_err(|e| {
-            MinervaError::InferenceError(format!("Failed to create session: {:?}", e))
+            MinervaError::InferenceError(format!("Failed to create inference session: {:?}", e))
         })?;
 
         // Store in mutex-protected Arc
@@ -520,5 +562,53 @@ mod tests {
         // Without setting tokenizer, should provide fallback message
         let result = backend.detokenize(&[1i32, 2i32, 3i32]).unwrap();
         assert!(result.contains("3 tokens"));
+    }
+
+    #[test]
+    fn test_format_detection_gguf() {
+        let path = std::path::Path::new("model.gguf");
+        assert_eq!(LlamaCppBackend::detect_format(path), "gguf");
+    }
+
+    #[test]
+    fn test_format_detection_safetensors() {
+        let path = std::path::Path::new("model.safetensors");
+        assert_eq!(LlamaCppBackend::detect_format(path), "safetensors");
+    }
+
+    #[test]
+    fn test_format_detection_huggingface_bin() {
+        let path = std::path::Path::new("model.bin");
+        assert_eq!(LlamaCppBackend::detect_format(path), "huggingface");
+    }
+
+    #[test]
+    fn test_format_detection_pytorch() {
+        let path = std::path::Path::new("model.pt");
+        assert_eq!(LlamaCppBackend::detect_format(path), "pytorch");
+    }
+
+    #[test]
+    fn test_format_detection_unknown() {
+        let path = std::path::Path::new("model.unknown");
+        assert_eq!(LlamaCppBackend::detect_format(path), "unknown");
+    }
+
+    #[test]
+    fn test_backend_can_handle_gguf() {
+        let path = std::path::Path::new("model.gguf");
+        assert!(LlamaCppBackend::can_handle(path));
+    }
+
+    #[test]
+    fn test_backend_cannot_handle_safetensors() {
+        let path = std::path::Path::new("model.safetensors");
+        assert!(!LlamaCppBackend::can_handle(path));
+    }
+
+    #[test]
+    fn test_backend_cannot_handle_huggingface() {
+        let path = std::path::Path::new("model.bin");
+        assert!(!LlamaCppBackend::can_handle(path));
     }
 }
