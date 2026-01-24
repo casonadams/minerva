@@ -1,5 +1,5 @@
+use super::metrics_recorder::MetricsRecorder;
 use super::metrics_snapshot_builder::{SnapshotBuilder, SnapshotParams};
-use super::response_time_store::ResponseTimeStore;
 /// Metrics Collection and Aggregation
 ///
 /// Tracks server-wide metrics:
@@ -7,22 +7,12 @@ use super::response_time_store::ResponseTimeStore;
 /// - Response times (average, percentiles)
 /// - Error tracking and rates
 /// - Cache hit rates
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
 /// Metrics collector
 pub struct MetricsCollector {
-    state: Arc<MetricsState>,
-}
-
-struct MetricsState {
-    total_requests: AtomicU64,
-    successful_requests: AtomicU64,
-    failed_requests: AtomicU64,
-    response_times: ResponseTimeStore,
-    cache_hits: AtomicU64,
-    cache_misses: AtomicU64,
+    recorder: Arc<MetricsRecorder>,
     start_time: std::time::Instant,
 }
 
@@ -30,54 +20,41 @@ impl MetricsCollector {
     /// Create new metrics collector
     pub fn new() -> Self {
         Self {
-            state: Arc::new(MetricsState {
-                total_requests: AtomicU64::new(0),
-                successful_requests: AtomicU64::new(0),
-                failed_requests: AtomicU64::new(0),
-                response_times: ResponseTimeStore::new(),
-                cache_hits: AtomicU64::new(0),
-                cache_misses: AtomicU64::new(0),
-                start_time: std::time::Instant::now(),
-            }),
+            recorder: Arc::new(MetricsRecorder::new()),
+            start_time: std::time::Instant::now(),
         }
     }
 
     /// Record a successful request with response time
     pub fn record_success(&self, response_time: Duration) {
-        self.state
-            .successful_requests
-            .fetch_add(1, Ordering::Relaxed);
-        self.state.total_requests.fetch_add(1, Ordering::Relaxed);
-        self.store_response_time(response_time);
+        self.recorder.record_success(response_time);
     }
 
     /// Record a failed request with response time
     pub fn record_failure(&self, response_time: Duration) {
-        self.state.failed_requests.fetch_add(1, Ordering::Relaxed);
-        self.state.total_requests.fetch_add(1, Ordering::Relaxed);
-        self.store_response_time(response_time);
+        self.recorder.record_failure(response_time);
     }
 
     /// Record cache hit
     pub fn record_cache_hit(&self) {
-        self.state.cache_hits.fetch_add(1, Ordering::Relaxed);
+        self.recorder.record_cache_hit();
     }
 
     /// Record cache miss
     pub fn record_cache_miss(&self) {
-        self.state.cache_misses.fetch_add(1, Ordering::Relaxed);
+        self.recorder.record_cache_miss();
     }
 
     /// Get current metrics snapshot
     pub fn snapshot(&self) -> MetricsSnapshot {
-        let total = self.state.total_requests.load(Ordering::Relaxed);
-        let success = self.state.successful_requests.load(Ordering::Relaxed);
-        let failed = self.state.failed_requests.load(Ordering::Relaxed);
-        let hits = self.state.cache_hits.load(Ordering::Relaxed);
-        let misses = self.state.cache_misses.load(Ordering::Relaxed);
+        let total = self.recorder.total_requests();
+        let success = self.recorder.successful_requests();
+        let failed = self.recorder.failed_requests();
+        let hits = self.recorder.cache_hits();
+        let misses = self.recorder.cache_misses();
 
-        let times = self.state.response_times.get_times();
-        let uptime_secs = self.state.start_time.elapsed().as_secs();
+        let times = self.recorder.response_times();
+        let uptime_secs = self.start_time.elapsed().as_secs();
 
         SnapshotBuilder::build(SnapshotParams {
             total,
@@ -92,23 +69,15 @@ impl MetricsCollector {
 
     /// Reset all metrics
     pub fn reset(&self) {
-        self.state.total_requests.store(0, Ordering::Relaxed);
-        self.state.successful_requests.store(0, Ordering::Relaxed);
-        self.state.failed_requests.store(0, Ordering::Relaxed);
-        self.state.cache_hits.store(0, Ordering::Relaxed);
-        self.state.cache_misses.store(0, Ordering::Relaxed);
-        self.state.response_times.clear();
-    }
-
-    fn store_response_time(&self, time: Duration) {
-        self.state.response_times.store(time);
+        self.recorder.reset();
     }
 }
 
 impl Clone for MetricsCollector {
     fn clone(&self) -> Self {
         Self {
-            state: Arc::clone(&self.state),
+            recorder: Arc::clone(&self.recorder),
+            start_time: self.start_time,
         }
     }
 }
