@@ -9,6 +9,8 @@
 pub mod circuit_breaker;
 pub mod coordinator;
 pub mod fallback;
+pub mod fallback_strategy;
+pub mod fallback_health;
 pub mod health;
 pub mod retry;
 pub mod timeout;
