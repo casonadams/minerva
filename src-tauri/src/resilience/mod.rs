@@ -13,6 +13,8 @@ pub mod fallback_strategy;
 pub mod fallback_health;
 pub mod health;
 pub mod retry;
+pub mod retry_config;
+pub mod retry_state;
 pub mod timeout;
 
 use crate::error::MinervaError;
