@@ -12,6 +12,7 @@ pub mod health_types;
 pub mod metrics;
 pub mod metrics_analyzer;
 pub mod metrics_calculator;
+pub mod metrics_collector;
 pub mod metrics_recorder;
 pub mod metrics_response;
 pub mod metrics_snapshot;
