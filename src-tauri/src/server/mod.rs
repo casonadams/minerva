@@ -1,4 +1,7 @@
 pub mod handlers;
+pub mod chat;
+pub mod streaming;
+pub mod validation;
 
 use axum::{Json, Router, extract::Path, extract::State, routing::{delete, get, post}, response::IntoResponse};
 use serde::{Deserialize, Serialize};
