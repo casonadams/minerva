@@ -224,15 +224,14 @@ fn detect_architecture(model_id: &str) -> String {
 /// Extract parameter count from model ID with robust parsing
 fn extract_param_count(model_id: &str) -> f32 {
     // Split by common separators and look for patterns like "7b", "13b", etc.
-    for part in model_id.split(|c: char| c == '-' || c == '_' || c == '/' || c == ' ') {
+    for part in model_id.split(['-', '_', '/', ' ']) {
         if part.ends_with('b') && part.len() > 1 {
-            // Try to parse the number before 'b'
             let num_str = &part[..part.len() - 1];
-            if let Ok(count) = num_str.parse::<f32>() {
-                if count > 0.1 && count < 2000.0 {
-                    // Reasonable range for parameter counts
-                    return count;
-                }
+            if let Ok(count) = num_str.parse::<f32>()
+                && count > 0.1
+                && count < 2000.0
+            {
+                return count;
             }
         }
     }
@@ -421,7 +420,7 @@ mod tests {
         ];
 
         for model_id in models {
-            let info = detect_mlx_model(model_id).expect(&format!("Failed for {}", model_id));
+            let info = detect_mlx_model(model_id).unwrap_or_else(|_| panic!("Failed for {}", model_id));
             assert!(info.supports_mlx);
             assert!(!info.architecture.is_empty());
             assert!(info.mlx_config.confidence >= 0.5);

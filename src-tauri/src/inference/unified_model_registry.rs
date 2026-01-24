@@ -73,6 +73,14 @@ pub struct InferenceStats {
     pub failed_inferences: u64,
 }
 
+/// Update to inference statistics
+#[derive(Debug, Clone)]
+pub struct StatsUpdate {
+    pub tokens: u64,
+    pub memory_mb: u64,
+    pub success: bool,
+}
+
 // ============================================================================
 // Model Registry Configuration
 // ============================================================================
@@ -241,15 +249,13 @@ impl UnifiedModelRegistry {
     pub async fn update_stats(
         &self,
         model_id: &str,
-        tokens: u64,
-        memory_mb: u64,
-        success: bool,
+        update: StatsUpdate,
     ) -> MinervaResult<()> {
         let mut stats = self.stats.write().await;
         if let Some(stat) = stats.get_mut(model_id) {
-            stat.total_tokens += tokens;
-            stat.peak_memory_mb = stat.peak_memory_mb.max(memory_mb);
-            if success {
+            stat.total_tokens += update.tokens;
+            stat.peak_memory_mb = stat.peak_memory_mb.max(update.memory_mb);
+            if update.success {
                 stat.successful_inferences += 1;
             } else {
                 stat.failed_inferences += 1;
@@ -446,9 +452,21 @@ mod tests {
         let registry = UnifiedModelRegistry::new();
         registry.register_model("test-model", None).await.unwrap();
         
-        registry.update_stats("test-model", 100, 1000, true).await.unwrap();
-        registry.update_stats("test-model", 50, 800, true).await.unwrap();
-        registry.update_stats("test-model", 0, 0, false).await.unwrap();
+        registry.update_stats("test-model", StatsUpdate {
+            tokens: 100,
+            memory_mb: 1000,
+            success: true,
+        }).await.unwrap();
+        registry.update_stats("test-model", StatsUpdate {
+            tokens: 50,
+            memory_mb: 800,
+            success: true,
+        }).await.unwrap();
+        registry.update_stats("test-model", StatsUpdate {
+            tokens: 0,
+            memory_mb: 0,
+            success: false,
+        }).await.unwrap();
         
         let stats = registry.get_stats("test-model").await.unwrap();
         assert_eq!(stats.total_tokens, 150);

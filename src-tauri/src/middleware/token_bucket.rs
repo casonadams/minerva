@@ -1,4 +1,6 @@
-use std::time::{Duration, Instant};
+#[cfg(test)]
+use std::time::Duration;
+use std::time::Instant;
 
 /// Token bucket for rate limiting
 #[derive(Clone)]

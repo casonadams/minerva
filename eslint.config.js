@@ -2,10 +2,10 @@ import js from '@eslint/js';
 
 export default [
   {
-    ignores: ['node_modules/**', 'build/**', 'dist/**', '.svelte-kit/**'],
+    ignores: ['node_modules/**', 'build/**', 'dist/**', '.svelte-kit/**', 'src/**/*'],
   },
   {
-    files: ['src/**/*.{js,ts,mjs,mts,cjs,cts}'],
+    files: ['**/*.js'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',

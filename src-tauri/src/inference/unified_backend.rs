@@ -225,13 +225,14 @@ fn extract_model_info(model_id: &str) -> (f32, Option<String>) {
 }
 
 fn extract_param_count(model_id: &str) -> f32 {
-    for part in model_id.split(|c: char| c == '-' || c == '_' || c == '/' || c == ' ') {
-        if part.ends_with('b') && part.len() > 1 {
-            if let Ok(count) = part[..part.len() - 1].parse::<f32>() {
-                if count > 0.1 && count < 2000.0 {
-                    return count;
-                }
-            }
+    for part in model_id.split(['-', '_', '/', ' ']) {
+        if part.ends_with('b')
+            && part.len() > 1
+            && let Ok(count) = part[..part.len() - 1].parse::<f32>()
+            && count > 0.1
+            && count < 2000.0
+        {
+            return count;
         }
     }
     3.0 // Default
@@ -510,7 +511,7 @@ mod tests {
         ];
 
         for model_id in models {
-            let info = detect_model(model_id, None).expect(&format!("Failed for {}", model_id));
+            let info = detect_model(model_id, None).unwrap_or_else(|_| panic!("Failed for {}", model_id));
             assert!(!info.architecture.is_empty());
             assert!(info.confidence >= 0.3);
         }

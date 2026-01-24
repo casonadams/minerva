@@ -8,6 +8,14 @@ use std::time::{Duration, Instant};
 // Progress Types
 // ============================================================================
 
+/// Progress update input
+#[derive(Debug, Clone)]
+pub struct ProgressUpdate {
+    pub downloaded: u64,
+    pub files_total: usize,
+    pub files_done: usize,
+}
+
 /// Download progress state
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DownloadProgress {
@@ -50,26 +58,21 @@ impl ProgressTracker {
     }
 
     /// Get progress
-    pub fn progress(
-        &self,
-        downloaded: u64,
-        files_total: usize,
-        files_done: usize,
-    ) -> DownloadProgress {
+    pub fn progress(&self, update: ProgressUpdate) -> DownloadProgress {
         let elapsed = self.start_time.elapsed().as_secs_f32();
         let speed_mbps = if elapsed > 0.0 {
-            (downloaded as f32 / (1024.0 * 1024.0)) / elapsed
+            (update.downloaded as f32 / (1024.0 * 1024.0)) / elapsed
         } else {
             0.0
         };
 
         let percent = if self.total_bytes > 0 {
-            ((downloaded as f32 / self.total_bytes as f32) * 100.0) as u8
+            ((update.downloaded as f32 / self.total_bytes as f32) * 100.0) as u8
         } else {
             0
         };
 
-        let remaining_bytes = self.total_bytes.saturating_sub(downloaded);
+        let remaining_bytes = self.total_bytes.saturating_sub(update.downloaded);
         let eta_seconds = if speed_mbps > 0.0 {
             (remaining_bytes as f32 / (1024.0 * 1024.0) / speed_mbps) as u64
         } else {
@@ -79,10 +82,10 @@ impl ProgressTracker {
         DownloadProgress {
             model_id: self.model_id.clone(),
             total_bytes: self.total_bytes,
-            downloaded_bytes: downloaded,
+            downloaded_bytes: update.downloaded,
             percent,
-            files_completed: files_done,
-            total_files: files_total,
+            files_completed: update.files_done,
+            total_files: update.files_total,
             speed_mbps,
             eta_seconds,
         }
@@ -113,7 +116,11 @@ mod tests {
     #[test]
     fn test_progress_calculation() {
         let tracker = ProgressTracker::new("test".to_string(), 1000);
-        let progress = tracker.progress(500, 10, 5);
+        let progress = tracker.progress(ProgressUpdate {
+            downloaded: 500,
+            files_total: 10,
+            files_done: 5,
+        });
         assert_eq!(progress.percent, 50);
         assert_eq!(progress.files_completed, 5);
     }
@@ -121,7 +128,11 @@ mod tests {
     #[test]
     fn test_progress_tracking() {
         let tracker = ProgressTracker::new("test".to_string(), 1000);
-        let progress = tracker.progress(250, 10, 2);
+        let progress = tracker.progress(ProgressUpdate {
+            downloaded: 250,
+            files_total: 10,
+            files_done: 2,
+        });
         // 250 / 1000 = 25%
         assert_eq!(progress.percent, 25);
     }

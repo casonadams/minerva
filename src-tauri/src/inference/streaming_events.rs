@@ -30,6 +30,16 @@ impl std::fmt::Display for StreamEventType {
     }
 }
 
+/// Token event data
+#[derive(Debug, Clone)]
+pub struct TokenData {
+    pub token_id: u32,
+    pub token: String,
+    pub index: u32,
+    pub total: u32,
+    pub tps: f32,
+}
+
 /// Stream event
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StreamEvent {
@@ -61,22 +71,15 @@ impl StreamEvent {
     }
 
     /// Token event
-    pub fn token(
-        stream_id: String,
-        token_id: u32,
-        token: String,
-        index: u32,
-        total: u32,
-        tps: f32,
-    ) -> Self {
+    pub fn token(stream_id: String, data: TokenData) -> Self {
         Self {
             event: StreamEventType::Token,
             stream_id,
-            token_id: Some(token_id),
-            token: Some(token),
-            index,
-            total_tokens: total,
-            tokens_per_second: tps,
+            token_id: Some(data.token_id),
+            token: Some(data.token),
+            index: data.index,
+            total_tokens: data.total,
+            tokens_per_second: data.tps,
             error: None,
             timestamp: current_timestamp(),
         }
@@ -138,7 +141,16 @@ mod tests {
 
     #[test]
     fn test_token_event() {
-        let e = StreamEvent::token("s1".to_string(), 42, "hi".to_string(), 0, 1, 25.0);
+        let e = StreamEvent::token(
+            "s1".to_string(),
+            TokenData {
+                token_id: 42,
+                token: "hi".to_string(),
+                index: 0,
+                total: 1,
+                tps: 25.0,
+            },
+        );
         assert_eq!(e.event, StreamEventType::Token);
         assert_eq!(e.token_id, Some(42));
     }
