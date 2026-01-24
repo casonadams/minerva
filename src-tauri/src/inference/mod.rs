@@ -8,6 +8,8 @@ pub mod api;
 pub mod downloader;
 pub mod model_loader;
 pub mod streaming;
+pub mod streaming_builder;
+pub mod mock_stream;
 pub mod streaming_events;
 pub mod mlx_model_support;
 pub mod unified_backend;
