@@ -1,7 +1,7 @@
 use axum::{
-    Json,
     http::StatusCode,
     response::{IntoResponse, Response},
+    Json,
 };
 use serde_json::json;
 use thiserror::Error;
@@ -54,6 +54,9 @@ pub enum MinervaError {
     /// Phase 3.5b: Streaming error - can retry
     #[error("Streaming error: {0}")]
     StreamingError(String),
+
+    #[error("Validation error: {0}")]
+    ValidationError(String),
 }
 
 impl IntoResponse for MinervaError {
@@ -105,6 +108,9 @@ impl IntoResponse for MinervaError {
                 "streaming_error",
                 format!("Streaming error (retryable): {}", msg),
             ),
+            MinervaError::ValidationError(msg) => {
+                (StatusCode::BAD_REQUEST, "validation_error", msg)
+            }
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "server_error",

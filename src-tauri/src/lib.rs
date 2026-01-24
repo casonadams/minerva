@@ -4,6 +4,7 @@ pub mod error;
 pub mod error_recovery;
 pub mod inference;
 pub mod logging;
+pub mod middleware;
 pub mod models;
 pub mod observability;
 pub mod performance;
