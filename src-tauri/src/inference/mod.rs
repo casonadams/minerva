@@ -40,6 +40,7 @@ pub mod model_cache_manager;
 pub mod model_cache;
 pub mod model_registry;
 pub mod parameters;
+pub mod parameter_validator;
 pub mod pattern_detector;
 pub mod phase5_integration;
 pub mod preload_manager;
