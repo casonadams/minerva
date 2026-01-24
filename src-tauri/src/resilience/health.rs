@@ -1,4 +1,6 @@
-/// Health Check Endpoints and Monitoring
+pub use super::component_health::ComponentHealth;
+pub use super::health_status::ComponentStatus;
+/// Health Check & Readiness Probes
 ///
 /// Provides health status for:
 /// - Service readiness
@@ -6,7 +8,6 @@
 /// - Resource constraints
 /// - Operational metrics
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Health check response
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -19,34 +20,7 @@ pub struct HealthResponse {
     pub components: ComponentHealth,
     /// Optional metadata
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<HashMap<String, String>>,
-}
-
-/// Individual component health
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ComponentHealth {
-    /// GPU status
-    pub gpu: ComponentStatus,
-    /// CPU status
-    pub cpu: ComponentStatus,
-    /// Memory status
-    pub memory: ComponentStatus,
-    /// Model cache status
-    pub model_cache: ComponentStatus,
-}
-
-/// Individual component status
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ComponentStatus {
-    /// Component name
-    pub name: String,
-    /// Is healthy (true/false)
-    pub healthy: bool,
-    /// Status message
-    pub message: String,
-    /// Optional metrics
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub metrics: Option<HashMap<String, String>>,
+    pub metadata: Option<std::collections::HashMap<String, String>>,
 }
 
 /// Ready check response
@@ -64,32 +38,7 @@ impl Default for HealthResponse {
         Self {
             status: "healthy".to_string(),
             timestamp: chrono::Local::now().to_rfc3339(),
-            components: ComponentHealth {
-                gpu: ComponentStatus {
-                    name: "gpu".to_string(),
-                    healthy: true,
-                    message: "GPU available".to_string(),
-                    metrics: None,
-                },
-                cpu: ComponentStatus {
-                    name: "cpu".to_string(),
-                    healthy: true,
-                    message: "CPU available".to_string(),
-                    metrics: None,
-                },
-                memory: ComponentStatus {
-                    name: "memory".to_string(),
-                    healthy: true,
-                    message: "Memory healthy".to_string(),
-                    metrics: None,
-                },
-                model_cache: ComponentStatus {
-                    name: "model_cache".to_string(),
-                    healthy: true,
-                    message: "Cache operational".to_string(),
-                    metrics: None,
-                },
-            },
+            components: ComponentHealth::all_healthy(),
             metadata: None,
         }
     }
@@ -130,34 +79,6 @@ impl HealthResponse {
     }
 }
 
-impl ComponentStatus {
-    /// Create healthy status
-    pub fn healthy(name: &str, message: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            healthy: true,
-            message: message.to_string(),
-            metrics: None,
-        }
-    }
-
-    /// Create unhealthy status
-    pub fn unhealthy(name: &str, message: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            healthy: false,
-            message: message.to_string(),
-            metrics: None,
-        }
-    }
-
-    /// Add metrics
-    pub fn with_metrics(mut self, metrics: HashMap<String, String>) -> Self {
-        self.metrics = Some(metrics);
-        self
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -171,13 +92,7 @@ mod tests {
 
     #[test]
     fn test_health_response_from_components() {
-        let components = ComponentHealth {
-            gpu: ComponentStatus::healthy("gpu", "Available"),
-            cpu: ComponentStatus::healthy("cpu", "Available"),
-            memory: ComponentStatus::healthy("memory", "Healthy"),
-            model_cache: ComponentStatus::healthy("cache", "OK"),
-        };
-
+        let components = ComponentHealth::all_healthy();
         let resp = HealthResponse::from_components(components);
         assert_eq!(resp.status, "healthy");
         assert!(resp.is_healthy());
@@ -185,43 +100,12 @@ mod tests {
 
     #[test]
     fn test_health_response_degraded() {
-        let components = ComponentHealth {
-            gpu: ComponentStatus::unhealthy("gpu", "Not available"),
-            cpu: ComponentStatus::healthy("cpu", "Available"),
-            memory: ComponentStatus::healthy("memory", "Healthy"),
-            model_cache: ComponentStatus::healthy("cache", "OK"),
-        };
+        let mut components = ComponentHealth::all_healthy();
+        components.gpu = ComponentStatus::unhealthy("gpu", "Not available");
 
         let resp = HealthResponse::from_components(components);
         assert_eq!(resp.status, "degraded");
         assert!(!resp.is_healthy());
-    }
-
-    #[test]
-    fn test_component_status_healthy() {
-        let status = ComponentStatus::healthy("test", "All good");
-        assert!(status.healthy);
-        assert_eq!(status.message, "All good");
-    }
-
-    #[test]
-    fn test_component_status_unhealthy() {
-        let status = ComponentStatus::unhealthy("test", "Failed");
-        assert!(!status.healthy);
-        assert_eq!(status.message, "Failed");
-    }
-
-    #[test]
-    fn test_component_status_with_metrics() {
-        let mut metrics = HashMap::new();
-        metrics.insert("usage".to_string(), "75%".to_string());
-
-        let status = ComponentStatus::healthy("test", "OK").with_metrics(metrics);
-        assert!(status.metrics.is_some());
-        assert_eq!(
-            status.metrics.as_ref().unwrap().get("usage").unwrap(),
-            "75%"
-        );
     }
 
     #[test]
@@ -253,16 +137,10 @@ mod tests {
 
     #[test]
     fn test_can_serve() {
-        let components = ComponentHealth {
-            gpu: ComponentStatus::healthy("gpu", "OK"),
-            cpu: ComponentStatus::healthy("cpu", "OK"),
-            memory: ComponentStatus::unhealthy("memory", "Pressure"),
-            model_cache: ComponentStatus::healthy("cache", "OK"),
-        };
+        let mut components = ComponentHealth::all_healthy();
+        components.memory = ComponentStatus::unhealthy("memory", "Pressure");
 
         let resp = HealthResponse::from_components(components);
-        // Note: can_serve checks for !memory.healthy (logical AND with other healthys)
-        // This test shows the behavior, but the logic should be reviewed
         assert_eq!(resp.status, "degraded");
     }
 }
