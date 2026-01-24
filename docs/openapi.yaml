@@ -1,0 +1,570 @@
+openapi: 3.0.3
+info:
+  title: Minerva API
+  description: Headless inference server compatible with OpenAI API
+  version: 0.2.0
+  contact:
+    name: Minerva Project
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+  - url: https://api.minerva.local
+    description: Production server
+
+paths:
+  /v1/models:
+    get:
+      summary: List available models
+      operationId: listModels
+      tags:
+        - Models
+      responses:
+        '200':
+          description: List of available models
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelListResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/models/{model_id}:
+    get:
+      summary: Get model details
+      operationId: getModel
+      tags:
+        - Models
+      parameters:
+        - name: model_id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 256
+      responses:
+        '200':
+          description: Model details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Model'
+        '404':
+          description: Model not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/chat/completions:
+    post:
+      summary: Create chat completion
+      operationId: createChatCompletion
+      tags:
+        - Chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatCompletionRequest'
+      responses:
+        '200':
+          description: Chat completion response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatCompletionResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Model not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/completions:
+    post:
+      summary: Create text completion
+      operationId: createCompletion
+      tags:
+        - Completions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompletionRequest'
+      responses:
+        '200':
+          description: Completion response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompletionResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Model not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/embeddings:
+    post:
+      summary: Create embeddings
+      operationId: createEmbeddings
+      tags:
+        - Embeddings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbeddingRequest'
+      responses:
+        '200':
+          description: Embeddings response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Model not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/health:
+    get:
+      summary: Health check endpoint
+      operationId: healthCheck
+      tags:
+        - System
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Server is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /v1/config:
+    get:
+      summary: Get server configuration
+      operationId: getConfig
+      tags:
+        - System
+      responses:
+        '200':
+          description: Server configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    Model:
+      type: object
+      required:
+        - id
+        - object
+        - created
+        - owned_by
+      properties:
+        id:
+          type: string
+          description: Model identifier
+        object:
+          type: string
+          enum: [model]
+        created:
+          type: integer
+          description: Unix timestamp
+        owned_by:
+          type: string
+          description: Model owner
+
+    ModelListResponse:
+      type: object
+      required:
+        - object
+        - data
+      properties:
+        object:
+          type: string
+          enum: [list]
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Model'
+
+    ChatMessage:
+      type: object
+      required:
+        - role
+        - content
+      properties:
+        role:
+          type: string
+          enum: [system, user, assistant]
+        content:
+          type: string
+
+    ChatCompletionRequest:
+      type: object
+      required:
+        - model
+        - messages
+      properties:
+        model:
+          type: string
+          minLength: 1
+          maxLength: 256
+        messages:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+          default: 0.7
+        max_tokens:
+          type: integer
+          minimum: 1
+          maximum: 4096
+        top_p:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 1
+        stream:
+          type: boolean
+          default: false
+
+    ChatChoice:
+      type: object
+      required:
+        - index
+        - message
+        - finish_reason
+      properties:
+        index:
+          type: integer
+        message:
+          $ref: '#/components/schemas/ChatMessage'
+        finish_reason:
+          type: string
+          enum: [stop, length, content_filter]
+
+    ChatCompletionResponse:
+      type: object
+      required:
+        - id
+        - object
+        - created
+        - model
+        - choices
+        - usage
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          enum: [chat.completion]
+        created:
+          type: integer
+        model:
+          type: string
+        choices:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatChoice'
+        usage:
+          $ref: '#/components/schemas/TokenUsage'
+
+    CompletionRequest:
+      type: object
+      required:
+        - model
+        - prompt
+      properties:
+        model:
+          type: string
+          minLength: 1
+          maxLength: 256
+        prompt:
+          type: string
+          minLength: 1
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+          default: 0.7
+        max_tokens:
+          type: integer
+          minimum: 1
+          maximum: 4096
+        top_p:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 1
+        stream:
+          type: boolean
+          default: false
+
+    CompletionChoice:
+      type: object
+      required:
+        - index
+        - text
+        - finish_reason
+      properties:
+        index:
+          type: integer
+        text:
+          type: string
+        finish_reason:
+          type: string
+          enum: [stop, length, content_filter]
+
+    CompletionResponse:
+      type: object
+      required:
+        - id
+        - object
+        - created
+        - model
+        - choices
+        - usage
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          enum: [text_completion]
+        created:
+          type: integer
+        model:
+          type: string
+        choices:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompletionChoice'
+        usage:
+          $ref: '#/components/schemas/TokenUsage'
+
+    EmbeddingRequest:
+      type: object
+      required:
+        - model
+        - input
+      properties:
+        model:
+          type: string
+          minLength: 1
+          maxLength: 256
+        input:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+
+    Embedding:
+      type: object
+      required:
+        - object
+        - embedding
+        - index
+      properties:
+        object:
+          type: string
+          enum: [embedding]
+        embedding:
+          type: array
+          items:
+            type: number
+        index:
+          type: integer
+
+    EmbeddingResponse:
+      type: object
+      required:
+        - object
+        - model
+        - data
+        - usage
+      properties:
+        object:
+          type: string
+          enum: [list]
+        model:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Embedding'
+        usage:
+          $ref: '#/components/schemas/TokenUsage'
+
+    TokenUsage:
+      type: object
+      required:
+        - prompt_tokens
+        - completion_tokens
+        - total_tokens
+      properties:
+        prompt_tokens:
+          type: integer
+        completion_tokens:
+          type: integer
+        total_tokens:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - message
+            - type
+            - code
+          properties:
+            message:
+              type: string
+            type:
+              type: string
+              enum: [invalid_request, model_not_found, rate_limit_exceeded, server_error]
+            code:
+              type: integer
+            param:
+              type: string
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - uptime_seconds
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        uptime_seconds:
+          type: integer
+        components:
+          type: object
+          additionalProperties:
+            type: string
+
+    ConfigResponse:
+      type: object
+      required:
+        - server
+        - api
+      properties:
+        server:
+          type: object
+          properties:
+            host:
+              type: string
+            port:
+              type: integer
+            workers:
+              type: integer
+        api:
+          type: object
+          properties:
+            version:
+              type: string
+            rate_limit:
+              type: object
+              properties:
+                requests_per_minute:
+                  type: integer
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Optional Bearer token for authentication
