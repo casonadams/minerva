@@ -7,6 +7,7 @@ pub mod sampling;
 pub mod model_loader;
 pub mod mlx_model_support;
 pub mod unified_backend;
+pub mod unified_model_registry;
 pub mod batch;
 pub mod batch_async;
 pub mod batch_measurement;
