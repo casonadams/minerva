@@ -8,7 +8,8 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
 use super::gguf_metadata_store::GGUFMetadataStore;
-use super::gguf_tensor::{GGUFDataType, GGUFTensor, GGUFTensorData};
+use super::gguf_tensor::GGUFTensor;
+use super::gguf_tensor_loader::GGUFTensorLoader;
 
 /// Metadata about a loaded GGUF model
 #[derive(Debug, Clone)]
@@ -71,7 +72,7 @@ impl GGUFModelLoader {
         // Load tensors
         let mut tensors = Vec::with_capacity(tensor_count as usize);
         for _ in 0..tensor_count {
-            match Self::load_tensor(&mut file) {
+            match GGUFTensorLoader::load_tensor(&mut file) {
                 Ok(tensor) => tensors.push(tensor),
                 Err(e) => {
                     tracing::warn!("Failed to load tensor: {}", e);
@@ -190,60 +191,6 @@ impl GGUFModelLoader {
         }
 
         Ok(())
-    }
-
-    /// Load a single tensor from file
-    fn load_tensor(file: &mut File) -> MinervaResult<GGUFTensor> {
-        // Read tensor name
-        let name = Self::read_string(file)?;
-
-        // Read tensor dimensions
-        let n_dims = Self::read_u32(file)? as usize;
-        let mut shape = Vec::with_capacity(n_dims);
-        for _ in 0..n_dims {
-            shape.push(Self::read_u64(file)?);
-        }
-
-        // Read data type
-        let dtype_u32 = Self::read_u32(file)?;
-        let data_type = GGUFDataType::from_u32(dtype_u32).ok_or_else(|| {
-            MinervaError::ModelLoadingError(format!("Unknown data type: {}", dtype_u32))
-        })?;
-
-        // Read data offset
-        let data_offset = Self::read_u64(file)?;
-
-        // Calculate expected data size
-        let element_count: u64 = shape.iter().product();
-        let expected_size = data_type.total_size(element_count as usize);
-
-        // Save current position and read data
-        let current_pos = file.stream_position().map_err(|e| {
-            MinervaError::ModelLoadingError(format!("Failed to get position: {}", e))
-        })?;
-
-        // Seek to data offset
-        file.seek(SeekFrom::Start(data_offset)).map_err(|e| {
-            MinervaError::ModelLoadingError(format!("Failed to seek to tensor data: {}", e))
-        })?;
-
-        // Read tensor data
-        let mut data = vec![0u8; expected_size];
-        file.read_exact(&mut data).map_err(|e| {
-            MinervaError::ModelLoadingError(format!("Failed to read tensor data: {}", e))
-        })?;
-
-        // Return to next tensor metadata position
-        file.seek(SeekFrom::Start(current_pos))
-            .map_err(|e| MinervaError::ModelLoadingError(format!("Failed to seek back: {}", e)))?;
-
-        let tensor_data = GGUFTensorData {
-            name,
-            data_type,
-            shape,
-            data,
-        };
-        Ok(GGUFTensor::new(tensor_data))
     }
 
     // ==================== Helper Functions ====================

@@ -7,6 +7,7 @@ pub mod gguf_metadata_store;
 pub mod gguf_parser;
 pub mod gguf_reader;
 pub mod gguf_tensor;
+pub mod gguf_tensor_loader;
 pub mod loader;
 pub mod model_info;
 pub mod model_registry;
