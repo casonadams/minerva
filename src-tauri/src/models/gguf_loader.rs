@@ -7,7 +7,7 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
-use super::gguf_metadata_store::GGUFMetadataStore;
+use super::gguf_kv_parser::GGUFKVParser;
 use super::gguf_tensor::GGUFTensor;
 use super::gguf_tensor_loader::GGUFTensorLoader;
 
@@ -57,7 +57,7 @@ impl GGUFModelLoader {
 
         // Parse key-value pairs
         for _ in 0..kv_count {
-            Self::parse_kv_pair(&mut file, &mut metadata)?;
+            GGUFKVParser::parse_kv_pair(&mut file, &mut metadata)?;
         }
 
         // Align to 32-byte boundary before reading tensors
@@ -111,83 +111,6 @@ impl GGUFModelLoader {
                 "Unsupported GGUF version: {}",
                 version
             )));
-        }
-
-        Ok(())
-    }
-
-    /// Parse a key-value pair from metadata
-    fn parse_kv_pair(file: &mut File, metadata: &mut GGUFModelMetadata) -> MinervaResult<()> {
-        // Read key
-        let key_len = Self::read_u32(file)? as usize;
-        let mut key_bytes = vec![0u8; key_len];
-        file.read_exact(&mut key_bytes)
-            .map_err(|e| MinervaError::ModelLoadingError(format!("Failed to read key: {}", e)))?;
-        let key = String::from_utf8_lossy(&key_bytes).to_string();
-
-        // Read value type
-        let value_type = Self::read_u32(file)?;
-
-        // Parse value based on type
-        match value_type {
-            0 => {
-                // u8
-                let _val = Self::read_u8(file)?;
-            }
-            1 => {
-                // i8
-                let _val = Self::read_i8(file)?;
-            }
-            2 => {
-                // u16
-                let _val = Self::read_u16(file)?;
-            }
-            3 => {
-                // i16
-                let _val = Self::read_i16(file)?;
-            }
-            4 => {
-                // u32
-                let val = Self::read_u32(file)?;
-                GGUFMetadataStore::store_u32(&key, val, metadata);
-            }
-            5 => {
-                // i32
-                let val = Self::read_i32(file)?;
-                GGUFMetadataStore::store_i32(&key, val, metadata);
-            }
-            6 => {
-                // f32
-                let _val = Self::read_f32(file)?;
-            }
-            7 => {
-                // u64
-                let val = Self::read_u64(file)?;
-                GGUFMetadataStore::store_u64(&key, val, metadata);
-            }
-            8 => {
-                // i64
-                let _val = Self::read_i64(file)?;
-            }
-            9 => {
-                // f64
-                let _val = Self::read_f64(file)?;
-            }
-            10 => {
-                // bool
-                let _val = Self::read_u8(file)? != 0;
-            }
-            11 => {
-                // string
-                let str_val = Self::read_string(file)?;
-                GGUFMetadataStore::store_string(&key, &str_val, metadata);
-            }
-            _ => {
-                return Err(MinervaError::ModelLoadingError(format!(
-                    "Unknown metadata type: {}",
-                    value_type
-                )));
-            }
         }
 
         Ok(())

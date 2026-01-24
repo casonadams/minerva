@@ -2,6 +2,7 @@ pub mod chat_types;
 pub mod data_type_conversion;
 pub mod gguf_data_type;
 pub mod gguf_header;
+pub mod gguf_kv_parser;
 pub mod gguf_loader;
 pub mod gguf_metadata_store;
 pub mod gguf_parser;
