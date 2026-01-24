@@ -1,5 +1,6 @@
 pub use super::circuit_breaker_config::CircuitBreakerConfig;
-
+use super::circuit_breaker_transitions::CircuitBreakerStateMachine;
+pub use super::circuit_breaker_transitions::CircuitState;
 /// Circuit Breaker Pattern
 ///
 /// Protects against cascading failures by:
@@ -12,159 +13,49 @@ pub use super::circuit_breaker_config::CircuitBreakerConfig;
 /// - Open → Half-Open: Timeout elapsed
 /// - Half-Open → Closed: Test request succeeds
 /// - Half-Open → Open: Test request fails
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-/// State of the circuit breaker
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CircuitState {
-    /// Normal operation, requests allowed
-    Closed,
-    /// Failing, reject requests immediately
-    Open,
-    /// Testing recovery, single request allowed
-    HalfOpen,
-}
-
-/// Circuit breaker state machine
+/// Circuit breaker state machine wrapper
 pub struct CircuitBreaker {
-    state: Arc<CircuitBreakerState>,
-}
-
-struct CircuitBreakerState {
-    // Current state: 0=Closed, 1=Open, 2=HalfOpen
-    state: AtomicU32,
-    // Consecutive failure count
-    failures: AtomicU32,
-    // Successful calls during half-open
-    successes: AtomicU32,
-    // Timestamp when opened (unix seconds)
-    opened_at: AtomicU64,
-    config: CircuitBreakerConfig,
+    state: Arc<CircuitBreakerStateMachine>,
 }
 
 impl CircuitBreaker {
     /// Create new circuit breaker with config
     pub fn new(config: CircuitBreakerConfig) -> Self {
         Self {
-            state: Arc::new(CircuitBreakerState {
-                state: AtomicU32::new(0), // Closed
-                failures: AtomicU32::new(0),
-                successes: AtomicU32::new(0),
-                opened_at: AtomicU64::new(0),
-                config,
-            }),
+            state: Arc::new(CircuitBreakerStateMachine::new(config)),
         }
     }
 
     /// Get current state
     pub fn state(&self) -> CircuitState {
-        match self.state.state.load(Ordering::SeqCst) {
-            0 => CircuitState::Closed,
-            1 => CircuitState::Open,
-            _ => CircuitState::HalfOpen,
-        }
+        self.state.state()
     }
 
     /// Check if operation is allowed
     pub fn allow_request(&self) -> bool {
-        match self.state() {
-            CircuitState::Closed => true,
-            CircuitState::Open => {
-                // Check if timeout elapsed
-                if let Ok(elapsed) = self.time_since_open() {
-                    if elapsed >= Duration::from_secs(self.state.config.timeout_secs) {
-                        self.transition_to_half_open();
-                        true
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            }
-            CircuitState::HalfOpen => {
-                let successes = self.state.successes.load(Ordering::SeqCst);
-                successes < self.state.config.half_open_max_calls
-            }
-        }
+        self.state.allow_request()
     }
 
     /// Record successful operation
     pub fn record_success(&self) {
-        match self.state() {
-            CircuitState::Closed => {
-                // Reset failures on success
-                self.state.failures.store(0, Ordering::SeqCst);
-            }
-            CircuitState::HalfOpen => {
-                // Track successes during half-open
-                let successes = self.state.successes.fetch_add(1, Ordering::SeqCst) + 1;
-                if successes >= self.state.config.half_open_max_calls {
-                    // Recovered, close circuit
-                    self.transition_to_closed();
-                }
-            }
-            _ => {}
-        }
+        self.state.record_success();
     }
 
     /// Record failed operation
     pub fn record_failure(&self) {
-        match self.state() {
-            CircuitState::Closed => {
-                let failures = self.state.failures.fetch_add(1, Ordering::SeqCst) + 1;
-                if failures >= self.state.config.failure_threshold {
-                    self.transition_to_open();
-                }
-            }
-            CircuitState::HalfOpen => {
-                // Failed during recovery attempt, open again
-                self.transition_to_open();
-            }
-            _ => {}
-        }
+        self.state.record_failure();
     }
 
     /// Get current failure count
     pub fn failures(&self) -> u32 {
-        self.state.failures.load(Ordering::SeqCst)
+        self.state.failures()
     }
 
     /// Reset circuit breaker
     pub fn reset(&self) {
-        self.state.failures.store(0, Ordering::SeqCst);
-        self.state.successes.store(0, Ordering::SeqCst);
-        self.state.opened_at.store(0, Ordering::SeqCst);
-        self.state.state.store(0, Ordering::SeqCst);
-    }
-
-    // Private helpers
-    fn transition_to_open(&self) {
-        self.state.state.store(1, Ordering::SeqCst);
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-        self.state.opened_at.store(now, Ordering::SeqCst);
-    }
-
-    fn transition_to_half_open(&self) {
-        self.state.state.store(2, Ordering::SeqCst);
-        self.state.successes.store(0, Ordering::SeqCst);
-    }
-
-    fn transition_to_closed(&self) {
-        self.state.state.store(0, Ordering::SeqCst);
-        self.state.failures.store(0, Ordering::SeqCst);
-        self.state.successes.store(0, Ordering::SeqCst);
-    }
-
-    fn time_since_open(&self) -> Result<Duration, std::time::SystemTimeError> {
-        let opened_at = self.state.opened_at.load(Ordering::SeqCst);
-        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-        Ok(Duration::from_secs(now.saturating_sub(opened_at)))
+        self.state.reset();
     }
 }
 
