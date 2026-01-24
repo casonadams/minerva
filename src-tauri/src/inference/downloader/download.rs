@@ -1,7 +1,7 @@
-/// Model Download Implementation
-///
-/// Handles downloading models from HuggingFace Hub with
-/// progress tracking, resume support, and error recovery.
+//! Model Download Implementation
+//!
+//! Handles downloading models from HuggingFace Hub with
+//! progress tracking, resume support, and error recovery.
 
 use crate::error::{MinervaError, MinervaResult};
 use serde::{Deserialize, Serialize};

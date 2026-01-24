@@ -6,7 +6,7 @@ pub struct ParamValidator;
 impl ParamValidator {
     /// Validate temperature parameter [0, 2]
     pub fn temperature(temp: f32) -> MinervaResult<()> {
-        if temp < 0.0 || temp > 2.0 {
+        if !(0.0..=2.0).contains(&temp) {
             return Err(MinervaError::ValidationError(format!(
                 "Temperature must be between 0 and 2, got {}",
                 temp

@@ -1,7 +1,7 @@
-/// API Request Handlers
-///
-/// Lean handlers that route to backend inference.
-/// Each handler is focused and ≤25 lines.
+//! API Request Handlers
+//!
+//! Lean handlers that route to backend inference.
+//! Each handler is focused and ≤25 lines.
 
 use super::types::*;
 use crate::error::MinervaResult;

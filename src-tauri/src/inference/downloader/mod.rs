@@ -1,7 +1,7 @@
-/// Model Downloader Module - Phase 10 Day 4
-///
-/// Download and manage models from HuggingFace Hub.
-/// Supports CLI and GUI operations with progress tracking.
+//! Model Downloader Module - Phase 10 Day 4
+//!
+//! Download and manage models from HuggingFace Hub.
+//! Supports CLI and GUI operations with progress tracking.
 
 pub mod download;
 pub mod cache;

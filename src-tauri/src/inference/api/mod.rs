@@ -1,7 +1,7 @@
-/// Inference API Module
-///
-/// REST/IPC interface for inference operations.
-/// Split into focused sub-modules for maintainability.
+//! Inference API Module
+//!
+//! REST/IPC interface for inference operations.
+//! Split into focused sub-modules for maintainability.
 
 pub mod types;
 pub mod handlers;

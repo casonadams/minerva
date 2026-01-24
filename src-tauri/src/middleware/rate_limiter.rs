@@ -111,7 +111,7 @@ mod tests {
         let limiter = RateLimiter::new(10.0, 2.0);
         limiter.allow_request("client1", 3.0).await;
         let remaining = limiter.remaining("client1").await;
-        assert!(remaining >= 7.0 && remaining <= 10.0);
+        assert!((7.0..=10.0).contains(&remaining));
     }
 
     #[tokio::test]

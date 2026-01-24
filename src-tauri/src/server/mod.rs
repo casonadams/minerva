@@ -8,7 +8,7 @@ use tower_http::cors::CorsLayer;
 
 use crate::error::MinervaResult;
 use crate::middleware::RateLimiter;
-use crate::models::{ModelInfo, ModelRegistry};
+use crate::models::ModelRegistry;
 use crate::observability::metrics::MetricsCollector;
 
 pub type SharedModelRegistry = Arc<Mutex<ModelRegistry>>;
@@ -251,8 +251,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_chat_completions_model_not_found() {
-        use axum::http::HeaderMap;
-
         let state = ServerState::new();
         let req = crate::models::ChatCompletionRequest {
             model: "nonexistent-model".to_string(),

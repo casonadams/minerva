@@ -1,30 +1,30 @@
-/// Phase 10 Day 2: Unified Dynamic Backend System
-///
-/// Consolidates all inference backends into a single dynamic system that:
-/// - Automatically detects model format and architecture
-/// - Routes to appropriate inference method (MLX, Pure Rust, llama.cpp)
-/// - Supports ANY model without hardcoding
-/// - Provides consistent interface across all backends
-/// - DRYs up common backend logic
-///
-/// # Design
-///
-/// ```text
-/// UnifiedBackend (single entry point)
-///     ├─ Detect Model (format + architecture)
-///     ├─ Auto-select Backend (MLX > Pure Rust > llama.cpp)
-///     ├─ Load Model (with error recovery)
-///     └─ Generate (streaming or batch)
-/// ```
-///
-/// # Features
-///
-/// - **Format Auto-Detection**: HF safetensors, GGUF, PyTorch, etc.
-/// - **Architecture Auto-Detection**: Works with ANY transformer
-/// - **Intelligent Routing**: Chooses optimal backend per model
-/// - **Fallback Chain**: Automatic degradation if primary fails
-/// - **Consistent API**: Single interface for all backends
-/// - **Dynamic Registration**: Add new backends without code changes
+//! Phase 10 Day 2: Unified Dynamic Backend System
+//!
+//! Consolidates all inference backends into a single dynamic system that:
+//! - Automatically detects model format and architecture
+//! - Routes to appropriate inference method (MLX, Pure Rust, llama.cpp)
+//! - Supports ANY model without hardcoding
+//! - Provides consistent interface across all backends
+//! - DRYs up common backend logic
+//!
+//! # Design
+//!
+//! ```text
+//! UnifiedBackend (single entry point)
+//!     ├─ Detect Model (format + architecture)
+//!     ├─ Auto-select Backend (MLX > Pure Rust > llama.cpp)
+//!     ├─ Load Model (with error recovery)
+//!     └─ Generate (streaming or batch)
+//! ```
+//!
+//! # Features
+//!
+//! - **Format Auto-Detection**: HF safetensors, GGUF, PyTorch, etc.
+//! - **Architecture Auto-Detection**: Works with ANY transformer
+//! - **Intelligent Routing**: Chooses optimal backend per model
+//! - **Fallback Chain**: Automatic degradation if primary fails
+//! - **Consistent API**: Single interface for all backends
+//! - **Dynamic Registration**: Add new backends without code changes
 
 use crate::error::MinervaResult;
 use serde::{Deserialize, Serialize};

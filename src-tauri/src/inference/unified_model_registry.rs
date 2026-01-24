@@ -1,29 +1,29 @@
-/// Phase 10 Day 3: Unified Model Registry
-///
-/// Central registry that bridges Pure Rust and MLX inference backends,
-/// providing a unified interface for model lifecycle management.
-///
-/// # Architecture
-///
-/// ```text
-/// Application
-///     ↓
-/// UnifiedModelRegistry
-///     ├─ ModelMetadata (detection)
-///     ├─ ModelInstance (active model)
-///     ├─ Pure Rust Backend (for safetensors)
-///     └─ MLX Backend (for Apple Silicon)
-/// ```
-///
-/// # Features
-///
-/// - **Unified Interface**: Single API for all backends
-/// - **Auto-routing**: Uses best backend per model/hardware
-/// - **Lifecycle Management**: Load, cache, unload models
-/// - **Error Recovery**: Automatic fallback chains
-/// - **Performance Tracking**: Inference timing and memory usage
-/// - **Multi-model Support**: Load multiple models concurrently
-/// - **Thread-safe**: Full async/await support
+//! Phase 10 Day 3: Unified Model Registry
+//!
+//! Central registry that bridges Pure Rust and MLX inference backends,
+//! providing a unified interface for model lifecycle management.
+//!
+//! # Architecture
+//!
+//! ```text
+//! Application
+//!     ↓
+//! UnifiedModelRegistry
+//!     ├─ ModelMetadata (detection)
+//!     ├─ ModelInstance (active model)
+//!     ├─ Pure Rust Backend (for safetensors)
+//!     └─ MLX Backend (for Apple Silicon)
+//! ```
+//!
+//! # Features
+//!
+//! - **Unified Interface**: Single API for all backends
+//! - **Auto-routing**: Uses best backend per model/hardware
+//! - **Lifecycle Management**: Load, cache, unload models
+//! - **Error Recovery**: Automatic fallback chains
+//! - **Performance Tracking**: Inference timing and memory usage
+//! - **Multi-model Support**: Load multiple models concurrently
+//! - **Thread-safe**: Full async/await support
 
 use crate::error::{MinervaResult, MinervaError};
 use crate::inference::unified_backend::{ModelInfo, detect_model, BackendStrategy};

@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 /// Token bucket for rate limiting
 #[derive(Clone)]
@@ -98,6 +98,6 @@ mod tests {
         let mut bucket = TokenBucket::new(10.0, 2.0);
         bucket.try_take(3.0);
         let avail = bucket.available();
-        assert!(avail >= 7.0 && avail <= 10.0);
+        assert!((7.0..=10.0).contains(&avail));
     }
 }

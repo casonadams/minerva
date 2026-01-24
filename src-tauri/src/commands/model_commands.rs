@@ -1,7 +1,7 @@
-/// Model Management Commands
-///
-/// Tauri commands for loading and downloading models.
-/// Exposed to frontend for GUI operations.
+//! Model Management Commands
+//!
+//! Tauri commands for loading and downloading models.
+//! Exposed to frontend for GUI operations.
 
 use crate::inference::downloader::{ModelDownloader, ModelDownloadRequest};
 use serde::{Deserialize, Serialize};
