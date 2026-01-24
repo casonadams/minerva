@@ -1,6 +1,6 @@
 use super::circuit_breaker_config::CircuitBreakerConfig;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use super::circuit_state_transitions::StateTransitionHelper;
+use std::time::Duration;
 
 /// Circuit breaker states
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -15,10 +15,7 @@ pub enum CircuitState {
 
 /// State machine for circuit breaker transitions
 pub struct CircuitBreakerStateMachine {
-    state: AtomicU32,
-    failures: AtomicU32,
-    successes: AtomicU32,
-    opened_at: AtomicU64,
+    transitions: StateTransitionHelper,
     config: CircuitBreakerConfig,
 }
 
@@ -26,17 +23,14 @@ impl CircuitBreakerStateMachine {
     /// Create new state machine
     pub fn new(config: CircuitBreakerConfig) -> Self {
         Self {
-            state: AtomicU32::new(0), // Closed
-            failures: AtomicU32::new(0),
-            successes: AtomicU32::new(0),
-            opened_at: AtomicU64::new(0),
+            transitions: StateTransitionHelper::new(),
             config,
         }
     }
 
     /// Get current state
     pub fn state(&self) -> CircuitState {
-        match self.state.load(Ordering::SeqCst) {
+        match self.transitions.get_state() {
             0 => CircuitState::Closed,
             1 => CircuitState::Open,
             _ => CircuitState::HalfOpen,
@@ -48,9 +42,9 @@ impl CircuitBreakerStateMachine {
         match self.state() {
             CircuitState::Closed => true,
             CircuitState::Open => {
-                if let Ok(elapsed) = self.time_since_open() {
+                if let Ok(elapsed) = self.transitions.time_since_open() {
                     if elapsed >= Duration::from_secs(self.config.timeout_secs) {
-                        self.transition_to_half_open();
+                        self.transitions.transition_to_half_open();
                         true
                     } else {
                         false
@@ -60,7 +54,7 @@ impl CircuitBreakerStateMachine {
                 }
             }
             CircuitState::HalfOpen => {
-                let successes = self.successes.load(Ordering::SeqCst);
+                let successes = self.transitions.get_successes();
                 successes < self.config.half_open_max_calls
             }
         }
@@ -70,12 +64,12 @@ impl CircuitBreakerStateMachine {
     pub fn record_success(&self) {
         match self.state() {
             CircuitState::Closed => {
-                self.failures.store(0, Ordering::SeqCst);
+                self.transitions.reset_failures();
             }
             CircuitState::HalfOpen => {
-                let successes = self.successes.fetch_add(1, Ordering::SeqCst) + 1;
+                let successes = self.transitions.increment_successes();
                 if successes >= self.config.half_open_max_calls {
-                    self.transition_to_closed();
+                    self.transitions.transition_to_closed();
                 }
             }
             _ => {}
@@ -86,13 +80,13 @@ impl CircuitBreakerStateMachine {
     pub fn record_failure(&self) {
         match self.state() {
             CircuitState::Closed => {
-                let failures = self.failures.fetch_add(1, Ordering::SeqCst) + 1;
+                let failures = self.transitions.increment_failures();
                 if failures >= self.config.failure_threshold {
-                    self.transition_to_open();
+                    self.transitions.transition_to_open();
                 }
             }
             CircuitState::HalfOpen => {
-                self.transition_to_open();
+                self.transitions.transition_to_open();
             }
             _ => {}
         }
@@ -100,41 +94,12 @@ impl CircuitBreakerStateMachine {
 
     /// Get current failure count
     pub fn failures(&self) -> u32 {
-        self.failures.load(Ordering::SeqCst)
+        self.transitions.get_failures()
     }
 
     /// Reset state machine
     pub fn reset(&self) {
-        self.failures.store(0, Ordering::SeqCst);
-        self.successes.store(0, Ordering::SeqCst);
-        self.opened_at.store(0, Ordering::SeqCst);
-        self.state.store(0, Ordering::SeqCst);
-    }
-
-    fn transition_to_open(&self) {
-        self.state.store(1, Ordering::SeqCst);
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-        self.opened_at.store(now, Ordering::SeqCst);
-    }
-
-    fn transition_to_half_open(&self) {
-        self.state.store(2, Ordering::SeqCst);
-        self.successes.store(0, Ordering::SeqCst);
-    }
-
-    fn transition_to_closed(&self) {
-        self.state.store(0, Ordering::SeqCst);
-        self.failures.store(0, Ordering::SeqCst);
-        self.successes.store(0, Ordering::SeqCst);
-    }
-
-    fn time_since_open(&self) -> Result<Duration, std::time::SystemTimeError> {
-        let opened_at = self.opened_at.load(Ordering::SeqCst);
-        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-        Ok(Duration::from_secs(now.saturating_sub(opened_at)))
+        self.transitions.reset_all();
     }
 }
 
@@ -172,5 +137,16 @@ mod tests {
         sm.record_failure();
         assert!(sm.allow_request());
         assert_eq!(sm.state(), CircuitState::HalfOpen);
+    }
+
+    #[test]
+    fn test_reset() {
+        let cfg = CircuitBreakerConfig::default();
+        let sm = CircuitBreakerStateMachine::new(cfg);
+        sm.record_failure();
+        sm.record_failure();
+        sm.reset();
+        assert_eq!(sm.state(), CircuitState::Closed);
+        assert_eq!(sm.failures(), 0);
     }
 }
