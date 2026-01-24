@@ -12,6 +12,7 @@ pub mod integration;
 pub mod metrics_analyzer_integration;
 pub mod metrics_queries;
 pub mod metrics_storage;
+pub mod operation_profile;
 pub mod performance_metrics;
 pub mod profile_analyzer;
 pub mod profiler;

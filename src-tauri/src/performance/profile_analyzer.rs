@@ -1,4 +1,4 @@
-use super::profiler::OperationProfile;
+use super::operation_profile::OperationProfile;
 use std::cmp::Reverse;
 
 /// Analyzes operation profiles and generates reports
