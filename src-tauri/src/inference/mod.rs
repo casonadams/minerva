@@ -1,5 +1,10 @@
 pub mod backend_manager;
 pub mod backend_selector;
+pub mod transformer_layers;
+pub mod transformer_components;
+pub mod inference_engine;
+pub mod sampling;
+pub mod model_loader;
 pub mod batch;
 pub mod batch_async;
 pub mod batch_measurement;
