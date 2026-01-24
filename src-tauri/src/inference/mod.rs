@@ -19,6 +19,7 @@ pub mod llama_inference;
 pub mod llama_tokenizer;
 pub mod metal_gpu;
 pub mod metrics;
+pub mod mlx_backend;
 pub mod model_cache_manager;
 pub mod model_cache;
 pub mod model_registry;
