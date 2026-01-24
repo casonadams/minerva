@@ -45,6 +45,7 @@ pub mod phase5_integration;
 pub mod preload_manager;
 pub mod pure_rust_backend;
 pub mod streaming_response;
+pub mod token_callback;
 pub mod token_stream;
 pub mod tokenizer;
 
