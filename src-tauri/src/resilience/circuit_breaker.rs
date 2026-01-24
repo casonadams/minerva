@@ -1,4 +1,6 @@
-/// Circuit Breaker Pattern Implementation
+pub use super::circuit_breaker_config::CircuitBreakerConfig;
+
+/// Circuit Breaker Pattern
 ///
 /// Protects against cascading failures by:
 /// - Closed: Normal operation, requests pass through
@@ -23,47 +25,6 @@ pub enum CircuitState {
     Open,
     /// Testing recovery, single request allowed
     HalfOpen,
-}
-
-/// Configuration for circuit breaker
-#[derive(Debug, Clone, Copy)]
-pub struct CircuitBreakerConfig {
-    /// Number of consecutive failures to open circuit
-    pub failure_threshold: u32,
-    /// Time to wait before attempting half-open
-    pub timeout_secs: u64,
-    /// Maximum requests during half-open state
-    pub half_open_max_calls: u32,
-}
-
-impl Default for CircuitBreakerConfig {
-    fn default() -> Self {
-        Self {
-            failure_threshold: 5,
-            timeout_secs: 30,
-            half_open_max_calls: 1,
-        }
-    }
-}
-
-impl CircuitBreakerConfig {
-    /// Create config for GPU operations (strict)
-    pub fn for_gpu() -> Self {
-        Self {
-            failure_threshold: 3,
-            timeout_secs: 60,
-            half_open_max_calls: 1,
-        }
-    }
-
-    /// Create config for network operations (lenient)
-    pub fn for_network() -> Self {
-        Self {
-            failure_threshold: 5,
-            timeout_secs: 10,
-            half_open_max_calls: 2,
-        }
-    }
 }
 
 /// Circuit breaker state machine
@@ -337,20 +298,6 @@ mod tests {
         cb.reset();
         assert_eq!(cb.state(), CircuitState::Closed);
         assert_eq!(cb.failures(), 0);
-    }
-
-    #[test]
-    fn test_circuit_breaker_for_gpu() {
-        let cfg = CircuitBreakerConfig::for_gpu();
-        assert_eq!(cfg.failure_threshold, 3);
-        assert!(cfg.timeout_secs >= 30);
-    }
-
-    #[test]
-    fn test_circuit_breaker_for_network() {
-        let cfg = CircuitBreakerConfig::for_network();
-        assert_eq!(cfg.failure_threshold, 5);
-        assert!(cfg.timeout_secs <= 30);
     }
 
     #[test]
