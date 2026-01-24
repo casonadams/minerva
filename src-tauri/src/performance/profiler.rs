@@ -1,3 +1,5 @@
+use super::profile_analyzer::ProfileAnalyzer;
+use super::scoped_timer::ScopedTimer;
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -7,7 +9,6 @@ use std::sync::Arc;
 /// - Operation timing
 /// - Bottleneck detection
 /// - Performance reports
-use std::time::Instant;
 
 /// Operation profile data
 #[derive(Debug, Clone)]
@@ -78,11 +79,7 @@ impl Profiler {
 
     /// Start timing an operation
     pub fn start(&self, name: &str) -> ScopedTimer {
-        ScopedTimer {
-            name: name.to_string(),
-            start: Instant::now(),
-            profiler: self.clone(),
-        }
+        ScopedTimer::new(name.to_string(), self.clone())
     }
 
     /// Record operation timing
@@ -106,37 +103,14 @@ impl Profiler {
 
     /// Get top N slowest operations by total time
     pub fn top_slowest(&self, n: usize) -> Vec<OperationProfile> {
-        let mut profiles = self.all();
-        profiles.sort_by_key(|p| std::cmp::Reverse(p.total_duration_ms));
-        profiles.into_iter().take(n).collect()
+        let profiles = self.all();
+        ProfileAnalyzer::top_slowest(&profiles, n)
     }
 
     /// Get summary report
     pub fn report(&self) -> String {
         let profiles = self.all();
-        if profiles.is_empty() {
-            return "No profiling data".to_string();
-        }
-
-        let total_ms: u64 = profiles.iter().map(|p| p.total_duration_ms).sum();
-        let mut report = format!("Performance Profile Report (Total: {}ms)\n", total_ms);
-        report.push_str(&"=".repeat(80));
-        report.push('\n');
-
-        for profile in profiles.iter() {
-            let pct = profile.time_percent(total_ms);
-            report.push_str(&format!(
-                "{:<30} {:>8} calls {:>10.2}ms avg {:>6.2}% [{} - {}]ms\n",
-                profile.name,
-                profile.call_count,
-                profile.avg_duration_ms(),
-                pct,
-                profile.min_duration_ms,
-                profile.max_duration_ms
-            ));
-        }
-
-        report
+        ProfileAnalyzer::generate_report(&profiles)
     }
 
     /// Reset all profiles
@@ -159,19 +133,7 @@ impl Default for Profiler {
     }
 }
 
-/// Scoped timer that records duration on drop
-pub struct ScopedTimer {
-    name: String,
-    start: Instant,
-    profiler: Profiler,
-}
-
-impl Drop for ScopedTimer {
-    fn drop(&mut self) {
-        let duration_ms = self.start.elapsed().as_millis() as u64;
-        self.profiler.record(&self.name, duration_ms);
-    }
-}
+// ScopedTimer is in scoped_timer module
 
 #[cfg(test)]
 mod tests {
@@ -242,31 +204,6 @@ mod tests {
         let op = prof.get("test_op").unwrap();
         assert_eq!(op.call_count, 1);
         assert!(op.total_duration_ms >= 10);
-    }
-
-    #[test]
-    fn test_profiler_top_slowest() {
-        let prof = Profiler::new();
-        prof.record("fast", 10);
-        prof.record("slow", 1000);
-        prof.record("medium", 500);
-
-        let top = prof.top_slowest(2);
-        assert_eq!(top.len(), 2);
-        assert_eq!(top[0].name, "slow");
-        assert_eq!(top[1].name, "medium");
-    }
-
-    #[test]
-    fn test_profiler_report() {
-        let prof = Profiler::new();
-        prof.record("op1", 100);
-        prof.record("op2", 200);
-
-        let report = prof.report();
-        assert!(report.contains("op1"));
-        assert!(report.contains("op2"));
-        assert!(report.contains("Report"));
     }
 
     #[test]
