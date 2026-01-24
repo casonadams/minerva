@@ -25,7 +25,8 @@ pub mod batch_processing; // Batch processing for tokenization and inference
 pub mod performance_metrics; // Performance tracking and benchmarking
 
 // Phase 11: REST API Decoupling & Headless Server
-pub mod http_api; // HTTP API endpoints and contracts
+pub mod headless_server;
+pub mod http_api; // HTTP API endpoints and contracts // Headless server and Tauri decoupling
 
 use std::fs;
 use std::path::{Path, PathBuf};
