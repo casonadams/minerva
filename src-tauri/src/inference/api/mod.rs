@@ -4,6 +4,8 @@
 //! Split into focused sub-modules for maintainability.
 
 pub mod types;
+pub mod response_types;
+pub mod request_types;
 pub mod handlers;
 
 pub use types::{
