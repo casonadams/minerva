@@ -19,6 +19,7 @@
 /// 4. Set is_mock = false in production builds
 /// ```
 use crate::error::{MinervaError, MinervaResult};
+use crate::inference::llama_tokenizer::LLaMATokenizer;
 use llama_cpp::standard_sampler::StandardSampler;
 use llama_cpp::{LlamaModel, LlamaParams, LlamaSession, SessionParams};
 use std::path::Path;
@@ -69,9 +70,11 @@ pub trait InferenceBackend: Send + Sync {
 ///
 /// This backend uses the actual llama_cpp crate for inference.
 /// It maintains a model and session for real LLM inference.
+/// Includes real BPE tokenization via LLaMATokenizer.
 pub struct LlamaCppBackend {
     model: Arc<Mutex<Option<LlamaModel>>>,
     session: Arc<Mutex<Option<LlamaSession>>>,
+    tokenizer: Arc<Mutex<Option<LLaMATokenizer>>>,
     n_ctx: usize,
     n_threads: usize,
 }
@@ -91,9 +94,39 @@ impl LlamaCppBackend {
         Self {
             model: Arc::new(Mutex::new(None)),
             session: Arc::new(Mutex::new(None)),
+            tokenizer: Arc::new(Mutex::new(None)),
             n_ctx: 0,
             n_threads: num_cpus::get(),
         }
+    }
+
+    /// Set tokenizer for this backend
+    pub fn set_tokenizer(&mut self, tokenizer: LLaMATokenizer) {
+        *self.tokenizer.lock().unwrap() = Some(tokenizer);
+    }
+
+    /// Create a fallback tokenizer from common vocabulary
+    #[allow(dead_code)]
+    fn create_fallback_tokenizer() -> LLaMATokenizer {
+        // Common vocabulary for most LLaMA models
+        let vocab = vec![
+            "<unk>".to_string(), // 0
+            "<s>".to_string(),   // 1
+            "</s>".to_string(),  // 2
+            // Common tokens
+            "the".to_string(),
+            "a".to_string(),
+            "and".to_string(),
+            "to".to_string(),
+            "of".to_string(),
+            "in".to_string(),
+            "is".to_string(),
+        ];
+        // This will succeed since vocab is non-empty
+        LLaMATokenizer::new(vocab).unwrap_or_else(|_| {
+            // Absolute fallback
+            LLaMATokenizer::new(vec!["<unk>".to_string(), "text".to_string()]).unwrap()
+        })
     }
 }
 
@@ -146,6 +179,7 @@ impl InferenceBackend for LlamaCppBackend {
     fn unload_model(&mut self) {
         *self.model.lock().unwrap() = None;
         *self.session.lock().unwrap() = None;
+        *self.tokenizer.lock().unwrap() = None;
         tracing::info!("Model unloaded");
     }
 
@@ -185,19 +219,34 @@ impl InferenceBackend for LlamaCppBackend {
     }
 
     fn tokenize(&self, text: &str) -> MinervaResult<Vec<i32>> {
-        // For now, provide a simple mock tokenization
-        // Real implementation would use the model's tokenizer
-        Ok(text
-            .split_whitespace()
-            .enumerate()
-            .map(|(i, _)| i as i32)
-            .collect())
+        let tokenizer = self.tokenizer.lock().unwrap();
+
+        if let Some(tokenizer) = tokenizer.as_ref() {
+            // Real tokenization using LLaMATokenizer
+            let tokens = tokenizer.encode(text)?;
+            Ok(tokens.iter().map(|&t| t as i32).collect())
+        } else {
+            // Fallback to simple word-based tokenization
+            // This happens if tokenizer not explicitly set
+            Ok(text
+                .split_whitespace()
+                .enumerate()
+                .map(|(i, _)| i as i32)
+                .collect())
+        }
     }
 
     fn detokenize(&self, tokens: &[i32]) -> MinervaResult<String> {
-        // For now, provide a simple mock detokenization
-        // Real implementation would use the model's detokenizer
-        Ok(format!("[{} tokens]", tokens.len()))
+        let tokenizer = self.tokenizer.lock().unwrap();
+
+        if let Some(tokenizer) = tokenizer.as_ref() {
+            // Real detokenization using LLaMATokenizer
+            let u32_tokens: Vec<u32> = tokens.iter().map(|&t| t as u32).collect();
+            tokenizer.decode(&u32_tokens)
+        } else {
+            // Fallback for when tokenizer not set
+            Ok(format!("[{} tokens]", tokens.len()))
+        }
     }
 
     fn is_loaded(&self) -> bool {
@@ -429,5 +478,47 @@ mod tests {
         let backend = LlamaCppBackend::new();
         assert!(!backend.is_loaded());
         // Since we don't have a real model, just verify the methods don't panic
+    }
+
+    #[test]
+    fn test_llama_cpp_backend_tokenize_with_tokenizer() {
+        use crate::inference::llama_tokenizer::LLaMATokenizer;
+
+        let mut backend = LlamaCppBackend::new();
+        let vocab = vec!["hello".to_string(), "world".to_string(), "test".to_string()];
+        let tokenizer = LLaMATokenizer::new(vocab).unwrap();
+        backend.set_tokenizer(tokenizer);
+
+        let result = backend.tokenize("hello world test").unwrap();
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn test_llama_cpp_backend_tokenize_fallback() {
+        let backend = LlamaCppBackend::new();
+        // Without setting tokenizer, should fall back to word-based
+        let result = backend.tokenize("hello world test").unwrap();
+        assert_eq!(result.len(), 3); // Three words
+    }
+
+    #[test]
+    fn test_llama_cpp_backend_detokenize_with_tokenizer() {
+        use crate::inference::llama_tokenizer::LLaMATokenizer;
+
+        let mut backend = LlamaCppBackend::new();
+        let vocab = vec!["hello".to_string(), "world".to_string(), "test".to_string()];
+        let tokenizer = LLaMATokenizer::new(vocab).unwrap();
+        backend.set_tokenizer(tokenizer);
+
+        let result = backend.detokenize(&[0i32, 1i32]).unwrap();
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn test_llama_cpp_backend_detokenize_fallback() {
+        let backend = LlamaCppBackend::new();
+        // Without setting tokenizer, should provide fallback message
+        let result = backend.detokenize(&[1i32, 2i32, 3i32]).unwrap();
+        assert!(result.contains("3 tokens"));
     }
 }
