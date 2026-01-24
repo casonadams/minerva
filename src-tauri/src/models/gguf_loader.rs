@@ -7,6 +7,7 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
+use super::gguf_metadata_store::GGUFMetadataStore;
 use super::gguf_tensor::{GGUFDataType, GGUFTensor, GGUFTensorData};
 
 /// Metadata about a loaded GGUF model
@@ -147,12 +148,12 @@ impl GGUFModelLoader {
             4 => {
                 // u32
                 let val = Self::read_u32(file)?;
-                Self::store_u32_metadata(&key, val, metadata);
+                GGUFMetadataStore::store_u32(&key, val, metadata);
             }
             5 => {
                 // i32
                 let val = Self::read_i32(file)?;
-                Self::store_i32_metadata(&key, val, metadata);
+                GGUFMetadataStore::store_i32(&key, val, metadata);
             }
             6 => {
                 // f32
@@ -161,7 +162,7 @@ impl GGUFModelLoader {
             7 => {
                 // u64
                 let val = Self::read_u64(file)?;
-                Self::store_u64_metadata(&key, val, metadata);
+                GGUFMetadataStore::store_u64(&key, val, metadata);
             }
             8 => {
                 // i64
@@ -178,7 +179,7 @@ impl GGUFModelLoader {
             11 => {
                 // string
                 let str_val = Self::read_string(file)?;
-                Self::store_string_metadata(&key, &str_val, metadata);
+                GGUFMetadataStore::store_string(&key, &str_val, metadata);
             }
             _ => {
                 return Err(MinervaError::ModelLoadingError(format!(
@@ -324,58 +325,6 @@ impl GGUFModelLoader {
             .map_err(|e| MinervaError::ModelLoadingError(e.to_string()))?;
         String::from_utf8(buf)
             .map_err(|e| MinervaError::ModelLoadingError(format!("Invalid UTF-8 in string: {}", e)))
-    }
-
-    fn store_u32_metadata(key: &str, value: u32, metadata: &mut GGUFModelMetadata) {
-        match key {
-            "llama.context_length" => metadata.context_window = Some(value as usize),
-            "llama.embedding_length" => metadata.embedding_length = Some(value as usize),
-            "llama.feed_forward_length" => metadata.feed_forward_length = Some(value as usize),
-            "llama.attention.head_count" => metadata.attention_head_count = Some(value as usize),
-            "llama.attention.head_count_kv" => {
-                metadata.attention_head_count_kv = Some(value as usize);
-            }
-            "llama.block_count" => metadata.layer_count = Some(value as usize),
-            "quantization_version" => metadata.quantization_version = Some(value as usize),
-            _ => {}
-        }
-    }
-
-    fn store_i32_metadata(key: &str, value: i32, metadata: &mut GGUFModelMetadata) {
-        match key {
-            "llama.context_length" => metadata.context_window = Some(value as usize),
-            "llama.embedding_length" => metadata.embedding_length = Some(value as usize),
-            "llama.feed_forward_length" => metadata.feed_forward_length = Some(value as usize),
-            "llama.attention.head_count" => metadata.attention_head_count = Some(value as usize),
-            "llama.attention.head_count_kv" => {
-                metadata.attention_head_count_kv = Some(value as usize);
-            }
-            "llama.block_count" => metadata.layer_count = Some(value as usize),
-            _ => {}
-        }
-    }
-
-    fn store_u64_metadata(key: &str, value: u64, metadata: &mut GGUFModelMetadata) {
-        match key {
-            "llama.context_length" => metadata.context_window = Some(value as usize),
-            "llama.embedding_length" => metadata.embedding_length = Some(value as usize),
-            "llama.feed_forward_length" => metadata.feed_forward_length = Some(value as usize),
-            "llama.attention.head_count" => metadata.attention_head_count = Some(value as usize),
-            "llama.attention.head_count_kv" => {
-                metadata.attention_head_count_kv = Some(value as usize);
-            }
-            "llama.block_count" => metadata.layer_count = Some(value as usize),
-            _ => {}
-        }
-    }
-
-    fn store_string_metadata(key: &str, value: &str, metadata: &mut GGUFModelMetadata) {
-        match key {
-            "general.name" => metadata.name = Some(value.to_string()),
-            "llama.model_name" => metadata.name = Some(value.to_string()),
-            "llama.architecture" => metadata.architecture = Some(value.to_string()),
-            _ => {}
-        }
     }
 }
 
