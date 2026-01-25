@@ -1,5 +1,5 @@
 use super::softmax_utils::{argmax, simple_random, softmax};
-use super::temperature::{apply_temperature, TemperatureConfig};
+use super::temperature::{TemperatureConfig, apply_temperature};
 /// Temperature-Based Token Sampling
 ///
 /// Applies temperature scaling to adjust probability distribution sharpness,
