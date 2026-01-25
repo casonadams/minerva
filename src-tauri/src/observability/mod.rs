@@ -14,6 +14,7 @@ pub mod metrics_analyzer;
 pub mod metrics_calculator;
 pub mod metrics_collector;
 pub mod metrics_recorder;
+pub mod metrics_recorder_tests;
 pub mod metrics_response;
 pub mod metrics_snapshot;
 pub mod metrics_snapshot_builder;
