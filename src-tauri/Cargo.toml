@@ -26,6 +26,18 @@ path = "src/bin/minerva-bench.rs"
 name = "download-mistral"
 path = "src/bin/download-mistral.rs"
 
+[[bin]]
+name = "verify-gguf"
+path = "src/bin/verify-gguf.rs"
+
+[[bin]]
+name = "verify-safetensors"
+path = "src/bin/verify-safetensors.rs"
+
+[[bin]]
+name = "verify-mlx"
+path = "src/bin/verify-mlx.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
