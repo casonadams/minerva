@@ -1,5 +1,6 @@
 pub use super::adaptive_config::AdaptiveConfig;
 
+use super::adaptive_adjuster::AdaptiveAdjuster;
 use super::execution_modes::ExecutionMode;
 use super::window_state::WindowState;
 use parking_lot::RwLock;
@@ -63,24 +64,13 @@ impl AdaptiveConfigManager {
     /// Adjust GPU usage based on temperature/load
     pub fn adjust_gpu_usage(&self, gpu_hot: bool, cpu_busy: bool) {
         let mut config = self.current.write();
-        if gpu_hot {
-            config.use_gpu = false;
-        } else if !cpu_busy && !config.use_gpu {
-            // GPU is cool and CPU is not busy, consider using GPU
-            config.use_gpu = true;
-        }
+        AdaptiveAdjuster::adjust_gpu_usage(&mut config, gpu_hot, cpu_busy);
     }
 
     /// Adjust batch size based on memory pressure
     pub fn adjust_batch_size(&self, memory_percent_used: f64) {
         let mut config = self.current.write();
-        if memory_percent_used > 80.0 {
-            config.batch_size = (config.batch_size as f64 * 0.7) as u32;
-            config.batch_size = config.batch_size.max(1);
-        } else if memory_percent_used < 40.0 && config.batch_size < 64 {
-            config.batch_size = (config.batch_size as f64 * 1.2) as u32;
-            config.batch_size = config.batch_size.min(64);
-        }
+        AdaptiveAdjuster::adjust_batch_size(&mut config, memory_percent_used);
     }
 }
 
