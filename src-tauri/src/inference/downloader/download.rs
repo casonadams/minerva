@@ -69,10 +69,7 @@ impl ModelDownloader {
     }
 
     /// Download model
-    pub async fn download(
-        &self,
-        req: &ModelDownloadRequest,
-    ) -> MinervaResult<DownloadResult> {
+    pub async fn download(&self, req: &ModelDownloadRequest) -> MinervaResult<DownloadResult> {
         self.validate(req)?;
         self.execute_download(req).await
     }
@@ -88,10 +85,7 @@ impl ModelDownloader {
     }
 
     /// Execute download (stub)
-    async fn execute_download(
-        &self,
-        req: &ModelDownloadRequest,
-    ) -> MinervaResult<DownloadResult> {
+    async fn execute_download(&self, req: &ModelDownloadRequest) -> MinervaResult<DownloadResult> {
         // TODO: Implement HuggingFace Hub download
         Ok(DownloadResult {
             model_id: req.model_id.clone(),

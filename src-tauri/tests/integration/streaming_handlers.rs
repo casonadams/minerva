@@ -1,8 +1,8 @@
 // Streaming Handler Tests - Integration with API handlers
 
 use minerva_lib::streaming::{
-    create_streaming_events, format_streaming_event, ChatCompletionStreamEvent, StreamingChoice,
-    StreamingDelta,
+    ChatCompletionStreamEvent, StreamingChoice, StreamingDelta, create_streaming_events,
+    format_streaming_event,
 };
 
 #[test]

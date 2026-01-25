@@ -1,5 +1,5 @@
 use crate::error::{MinervaError, MinervaResult};
-use crate::models::{gguf_parser::GGUFParser, ModelInfo};
+use crate::models::{ModelInfo, gguf_parser::GGUFParser};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 

@@ -343,7 +343,7 @@ mod tests {
 
         assert!(cache.append(&keys, &values).is_ok()); // 64 elements
         assert!(cache.append(&keys, &values).is_ok()); // 128 elements total
-                                                       // Third append should fail (would exceed 128)
+        // Third append should fail (would exceed 128)
         assert!(cache.append(&keys, &values).is_err());
     }
 
@@ -391,9 +391,11 @@ mod tests {
         let keys = vec![0.5; 512];
         let values = vec![0.5; 512];
 
-        assert!(manager
-            .add_layer_cache(0, KVPair::new(&keys, &values))
-            .is_ok());
+        assert!(
+            manager
+                .add_layer_cache(0, KVPair::new(&keys, &values))
+                .is_ok()
+        );
         assert_eq!(manager.seq_len(0).unwrap(), 512); // 512 elements added
     }
 
@@ -403,9 +405,11 @@ mod tests {
         let keys = vec![0.5; 256];
         let values = vec![0.5; 256];
 
-        assert!(manager
-            .add_layer_cache(0, KVPair::new(&keys, &values))
-            .is_ok());
+        assert!(
+            manager
+                .add_layer_cache(0, KVPair::new(&keys, &values))
+                .is_ok()
+        );
         assert_eq!(manager.seq_len(0).unwrap(), 256);
 
         let retrieved = manager.get_cached_keys(0, CacheRange::new(0, 256)).unwrap();

@@ -751,9 +751,11 @@ mod tests {
             kernel: KernelType::MatMul,
             ..Default::default()
         };
-        assert!(device
-            .execute_kernel(config, KernelBuffers::new(vec![a], out))
-            .is_err());
+        assert!(
+            device
+                .execute_kernel(config, KernelBuffers::new(vec![a], out))
+                .is_err()
+        );
     }
 
     #[test]

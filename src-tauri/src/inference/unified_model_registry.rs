@@ -25,8 +25,8 @@
 //! - **Multi-model Support**: Load multiple models concurrently
 //! - **Thread-safe**: Full async/await support
 
-use crate::error::{MinervaResult, MinervaError};
-use crate::inference::unified_backend::{ModelInfo, detect_model, BackendStrategy};
+use crate::error::{MinervaError, MinervaResult};
+use crate::inference::unified_backend::{BackendStrategy, ModelInfo, detect_model};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
@@ -207,12 +207,12 @@ impl UnifiedModelRegistry {
     /// Get model instance
     pub async fn get_model(&self, model_id: &str) -> MinervaResult<ModelInstance> {
         let mut models = self.models.write().await;
-        let instance = models
-            .get_mut(model_id)
-            .ok_or_else(|| MinervaError::ModelNotFound(format!(
+        let instance = models.get_mut(model_id).ok_or_else(|| {
+            MinervaError::ModelNotFound(format!(
                 "Model '{}' not registered. Use register_model first.",
                 model_id
-            )))?;
+            ))
+        })?;
 
         // Update last accessed
         instance.last_accessed = current_timestamp();
@@ -221,11 +221,7 @@ impl UnifiedModelRegistry {
     }
 
     /// Mark model as loaded
-    pub async fn mark_loaded(
-        &self,
-        model_id: &str,
-        memory_mb: u64,
-    ) -> MinervaResult<()> {
+    pub async fn mark_loaded(&self, model_id: &str, memory_mb: u64) -> MinervaResult<()> {
         let mut models = self.models.write().await;
         if let Some(instance) = models.get_mut(model_id) {
             instance.is_loaded = true;
@@ -246,11 +242,7 @@ impl UnifiedModelRegistry {
     }
 
     /// Update inference statistics
-    pub async fn update_stats(
-        &self,
-        model_id: &str,
-        update: StatsUpdate,
-    ) -> MinervaResult<()> {
+    pub async fn update_stats(&self, model_id: &str, update: StatsUpdate) -> MinervaResult<()> {
         let mut stats = self.stats.write().await;
         if let Some(stat) = stats.get_mut(model_id) {
             stat.total_tokens += update.tokens;
@@ -267,12 +259,9 @@ impl UnifiedModelRegistry {
     /// Get model statistics
     pub async fn get_stats(&self, model_id: &str) -> MinervaResult<InferenceStats> {
         let stats = self.stats.read().await;
-        stats
-            .get(model_id)
-            .cloned()
-            .ok_or_else(|| MinervaError::InferenceError(
-                format!("No statistics for model '{}'", model_id)
-            ))
+        stats.get(model_id).cloned().ok_or_else(|| {
+            MinervaError::InferenceError(format!("No statistics for model '{}'", model_id))
+        })
     }
 
     /// List all registered models
@@ -284,18 +273,14 @@ impl UnifiedModelRegistry {
     /// List loaded models
     pub async fn list_loaded_models(&self) -> MinervaResult<Vec<ModelInstance>> {
         let models = self.models.read().await;
-        Ok(models
-            .values()
-            .filter(|m| m.is_loaded)
-            .cloned()
-            .collect())
+        Ok(models.values().filter(|m| m.is_loaded).cloned().collect())
     }
 
     /// Unregister a model
     pub async fn unregister_model(&self, model_id: &str) -> MinervaResult<()> {
         let mut models = self.models.write().await;
         models.remove(model_id);
-        
+
         let mut stats = self.stats.write().await;
         stats.remove(model_id);
 
@@ -306,7 +291,7 @@ impl UnifiedModelRegistry {
     pub async fn clear(&self) -> MinervaResult<()> {
         let mut models = self.models.write().await;
         models.clear();
-        
+
         let mut stats = self.stats.write().await;
         stats.clear();
 
@@ -323,7 +308,8 @@ impl UnifiedModelRegistry {
         let format = parse_format(&info.format);
 
         // Get candidate backends
-        let strategies = BackendStrategy::select_for(format, &info.architecture, std::env::consts::OS)?;
+        let strategies =
+            BackendStrategy::select_for(format, &info.architecture, std::env::consts::OS)?;
 
         // Return best option
         Ok(strategies
@@ -335,7 +321,7 @@ impl UnifiedModelRegistry {
     /// Get recommended batch size for model
     pub async fn recommended_batch_size(&self, model_id: &str) -> MinervaResult<usize> {
         let instance = self.get_model(model_id).await?;
-        
+
         // Estimate based on parameters
         let batch_size = match instance.info.param_count {
             x if x < 3.0 => 32,
@@ -406,9 +392,15 @@ mod tests {
     #[tokio::test]
     async fn test_add_model_path() {
         let registry = UnifiedModelRegistry::new();
-        registry.add_model_path("/models/path".to_string()).await.unwrap();
-        registry.add_model_path("/models/path".to_string()).await.unwrap(); // Duplicate
-        
+        registry
+            .add_model_path("/models/path".to_string())
+            .await
+            .unwrap();
+        registry
+            .add_model_path("/models/path".to_string())
+            .await
+            .unwrap(); // Duplicate
+
         let paths = registry.model_paths.read().await;
         assert_eq!(paths.len(), 1); // No duplicates
     }
@@ -430,7 +422,7 @@ mod tests {
     async fn test_get_model() {
         let registry = UnifiedModelRegistry::new();
         registry.register_model("test-model", None).await.unwrap();
-        
+
         let instance = registry.get_model("test-model").await.unwrap();
         assert_eq!(instance.model_id, "test-model");
     }
@@ -439,10 +431,10 @@ mod tests {
     async fn test_mark_loaded() {
         let registry = UnifiedModelRegistry::new();
         registry.register_model("test-model", None).await.unwrap();
-        
+
         registry.mark_loaded("test-model", 5000).await.unwrap();
         let instance = registry.get_model("test-model").await.unwrap();
-        
+
         assert!(instance.is_loaded);
         assert_eq!(instance.memory_mb, 5000);
     }
@@ -451,23 +443,41 @@ mod tests {
     async fn test_stats_tracking() {
         let registry = UnifiedModelRegistry::new();
         registry.register_model("test-model", None).await.unwrap();
-        
-        registry.update_stats("test-model", StatsUpdate {
-            tokens: 100,
-            memory_mb: 1000,
-            success: true,
-        }).await.unwrap();
-        registry.update_stats("test-model", StatsUpdate {
-            tokens: 50,
-            memory_mb: 800,
-            success: true,
-        }).await.unwrap();
-        registry.update_stats("test-model", StatsUpdate {
-            tokens: 0,
-            memory_mb: 0,
-            success: false,
-        }).await.unwrap();
-        
+
+        registry
+            .update_stats(
+                "test-model",
+                StatsUpdate {
+                    tokens: 100,
+                    memory_mb: 1000,
+                    success: true,
+                },
+            )
+            .await
+            .unwrap();
+        registry
+            .update_stats(
+                "test-model",
+                StatsUpdate {
+                    tokens: 50,
+                    memory_mb: 800,
+                    success: true,
+                },
+            )
+            .await
+            .unwrap();
+        registry
+            .update_stats(
+                "test-model",
+                StatsUpdate {
+                    tokens: 0,
+                    memory_mb: 0,
+                    success: false,
+                },
+            )
+            .await
+            .unwrap();
+
         let stats = registry.get_stats("test-model").await.unwrap();
         assert_eq!(stats.total_tokens, 150);
         assert_eq!(stats.successful_inferences, 2);
@@ -479,7 +489,7 @@ mod tests {
         let registry = UnifiedModelRegistry::new();
         registry.register_model("model1", None).await.unwrap();
         registry.register_model("model2", None).await.unwrap();
-        
+
         let models = registry.list_models().await.unwrap();
         assert_eq!(models.len(), 2);
     }
@@ -489,7 +499,7 @@ mod tests {
         let registry = UnifiedModelRegistry::new();
         registry.register_model("test-model", None).await.unwrap();
         registry.unregister_model("test-model").await.unwrap();
-        
+
         let models = registry.list_models().await.unwrap();
         assert!(models.is_empty());
     }
@@ -499,9 +509,9 @@ mod tests {
         let registry = UnifiedModelRegistry::new();
         registry.register_model("model1", None).await.unwrap();
         registry.register_model("model2", None).await.unwrap();
-        
+
         registry.clear().await.unwrap();
-        
+
         let models = registry.list_models().await.unwrap();
         assert!(models.is_empty());
     }
@@ -509,9 +519,15 @@ mod tests {
     #[tokio::test]
     async fn test_recommended_batch_size() {
         let registry = UnifiedModelRegistry::new();
-        registry.register_model("meta-llama/Llama-2-7b", None).await.unwrap();
-        
-        let batch_size = registry.recommended_batch_size("meta-llama/Llama-2-7b").await.unwrap();
+        registry
+            .register_model("meta-llama/Llama-2-7b", None)
+            .await
+            .unwrap();
+
+        let batch_size = registry
+            .recommended_batch_size("meta-llama/Llama-2-7b")
+            .await
+            .unwrap();
         assert!(batch_size > 0);
     }
 }

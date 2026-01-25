@@ -76,20 +76,24 @@ mod tests {
     #[test]
     fn test_server_state_creation() {
         let state = ServerState::new();
-        assert!(state
-            .model_registry
-            .blocking_lock()
-            .list_models()
-            .is_empty());
+        assert!(
+            state
+                .model_registry
+                .blocking_lock()
+                .list_models()
+                .is_empty()
+        );
     }
 
     #[test]
     fn test_server_state_default() {
         let state = ServerState::default();
-        assert!(state
-            .model_registry
-            .blocking_lock()
-            .list_models()
-            .is_empty());
+        assert!(
+            state
+                .model_registry
+                .blocking_lock()
+                .list_models()
+                .is_empty()
+        );
     }
 }

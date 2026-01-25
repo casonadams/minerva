@@ -420,7 +420,8 @@ mod tests {
         ];
 
         for model_id in models {
-            let info = detect_mlx_model(model_id).unwrap_or_else(|_| panic!("Failed for {}", model_id));
+            let info =
+                detect_mlx_model(model_id).unwrap_or_else(|_| panic!("Failed for {}", model_id));
             assert!(info.supports_mlx);
             assert!(!info.architecture.is_empty());
             assert!(info.mlx_config.confidence >= 0.5);

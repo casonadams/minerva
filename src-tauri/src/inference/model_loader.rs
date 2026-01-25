@@ -161,7 +161,7 @@ impl ModelMetadata {
             ModelType::Unknown => {
                 return Err(MinervaError::InferenceError(
                     "Cannot infer config for unknown model type".to_string(),
-                ))
+                ));
             }
         };
 
@@ -326,8 +326,9 @@ impl ModelLoader {
         expected_size: usize,
     ) -> MinervaResult<Vec<f32>> {
         for name in possible_names {
-            if let Some(tensor) = tensors.get(*name) 
-                && tensor.len() == expected_size {
+            if let Some(tensor) = tensors.get(*name)
+                && tensor.len() == expected_size
+            {
                 return Ok(tensor.clone());
             }
         }
@@ -440,10 +441,12 @@ mod tests {
     fn test_model_loader_config_from_directory_missing_weights() {
         let result = ModelLoaderConfig::from_directory("/nonexistent/path");
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Weights file not found"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Weights file not found")
+        );
     }
 
     #[test]
@@ -479,10 +482,12 @@ mod tests {
 
         let result = metadata.to_engine_config();
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("unknown model type"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("unknown model type")
+        );
     }
 
     #[test]
@@ -572,10 +577,12 @@ mod tests {
         let result = ModelLoader::extract_tensor(&tensors, &["missing.weight"], 4);
 
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Could not find tensor"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Could not find tensor")
+        );
     }
 
     fn create_dummy_weights(config: &InferenceEngineConfig) -> ModelWeights {

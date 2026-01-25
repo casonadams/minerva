@@ -169,9 +169,7 @@ fn detect_architecture_from_config(path: &Path) -> Option<String> {
     if config_path.exists() {
         std::fs::read_to_string(&config_path)
             .ok()
-            .and_then(|content| {
-                serde_json::from_str::<serde_json::Value>(&content).ok()
-            })
+            .and_then(|content| serde_json::from_str::<serde_json::Value>(&content).ok())
             .and_then(|json| {
                 json.get("model_type")
                     .or_else(|| json.get("architectures")?.get(0))
@@ -471,10 +469,7 @@ mod tests {
 
     #[test]
     fn test_quantization_detection() {
-        assert_eq!(
-            extract_quantization("model-int4"),
-            Some("int4".to_string())
-        );
+        assert_eq!(extract_quantization("model-int4"), Some("int4".to_string()));
         assert_eq!(
             extract_quantization("model-fp16"),
             Some("float16".to_string())
@@ -491,12 +486,8 @@ mod tests {
 
     #[test]
     fn test_backend_selection() {
-        let candidates = BackendStrategy::select_for(
-            ModelFormat::Safetensors,
-            "llama",
-            "darwin",
-        )
-        .unwrap();
+        let candidates =
+            BackendStrategy::select_for(ModelFormat::Safetensors, "llama", "darwin").unwrap();
         assert!(!candidates.is_empty());
     }
 
@@ -511,7 +502,8 @@ mod tests {
         ];
 
         for model_id in models {
-            let info = detect_model(model_id, None).unwrap_or_else(|_| panic!("Failed for {}", model_id));
+            let info =
+                detect_model(model_id, None).unwrap_or_else(|_| panic!("Failed for {}", model_id));
             assert!(!info.architecture.is_empty());
             assert!(info.confidence >= 0.3);
         }

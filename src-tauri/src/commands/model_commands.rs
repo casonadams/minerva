@@ -3,7 +3,7 @@
 //! Tauri commands for loading and downloading models.
 //! Exposed to frontend for GUI operations.
 
-use crate::inference::downloader::{ModelDownloader, ModelDownloadRequest};
+use crate::inference::downloader::{ModelDownloadRequest, ModelDownloader};
 use serde::{Deserialize, Serialize};
 
 // ============================================================================

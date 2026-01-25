@@ -1,8 +1,8 @@
 use super::transformer_components::{
-    add_position_encoding, create_position_encoding, embed_tokens, transformer_block, Activation,
-    EmbeddingConfig, PositionConfig, TransformerBlockConfig, TransformerBlockWeights,
+    Activation, EmbeddingConfig, PositionConfig, TransformerBlockConfig, TransformerBlockWeights,
+    add_position_encoding, create_position_encoding, embed_tokens, transformer_block,
 };
-use super::transformer_layers::{layer_norm, LayerNormConfig as LNCfg};
+use super::transformer_layers::{LayerNormConfig as LNCfg, layer_norm};
 /// Complete Inference Engine - Phase 9 Day 4
 ///
 /// This module integrates all transformer components into a single,

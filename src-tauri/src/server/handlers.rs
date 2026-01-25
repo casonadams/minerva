@@ -1,11 +1,11 @@
-use axum::{Json, response::IntoResponse};
-use crate::error::MinervaResult;
-use crate::models::ChatCompletionRequest;
-use axum::http::HeaderMap;
-use crate::server::ServerState;
 use super::chat::create_completion_response;
 use super::streaming::create_streaming_response;
 use super::validation::validate_chat_request;
+use crate::error::MinervaResult;
+use crate::models::ChatCompletionRequest;
+use crate::server::ServerState;
+use axum::http::HeaderMap;
+use axum::{Json, response::IntoResponse};
 
 pub async fn list_models(
     axum::extract::State(state): axum::extract::State<ServerState>,
@@ -40,11 +40,9 @@ pub async fn chat_completions(
     }
 
     let registry = state.model_registry.lock().await;
-    registry
-        .get_model(&req.model)
-        .ok_or_else(|| crate::error::MinervaError::ModelNotFound(
-            format!("Model '{}' not found", req.model)
-        ))?;
+    registry.get_model(&req.model).ok_or_else(|| {
+        crate::error::MinervaError::ModelNotFound(format!("Model '{}' not found", req.model))
+    })?;
 
     let is_streaming = req.stream.unwrap_or(false);
 

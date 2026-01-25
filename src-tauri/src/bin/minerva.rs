@@ -22,7 +22,7 @@ enum Commands {
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
-    
+
     match cli.command {
         Commands::Serve(args) => {
             if let Err(e) = cli::serve_command(args).await {

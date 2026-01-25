@@ -1,9 +1,9 @@
 //! Protocol Compliance Middleware
 //! Ensures all API requests and responses follow OpenAI-compatible standards
 
-use axum::middleware::Next;
-use axum::http::Request;
 use axum::body::Body;
+use axum::http::Request;
+use axum::middleware::Next;
 use axum::response::Response;
 
 /// Request ID from X-Request-ID header
@@ -15,10 +15,7 @@ pub const API_VERSION: &str = "0.1.0";
 pub const OPENAI_COMPATIBLE_VERSION: &str = "OpenAI compatible";
 
 /// Middleware to add protocol headers to responses
-pub async fn add_protocol_headers(
-    mut req: Request<Body>,
-    next: Next,
-) -> Response {
+pub async fn add_protocol_headers(mut req: Request<Body>, next: Next) -> Response {
     // Generate request ID if not present
     let request_id = req
         .headers()
@@ -41,12 +38,13 @@ pub async fn add_protocol_headers(
     // Add protocol headers
     response.headers_mut().insert(
         "X-Request-ID",
-        request_id.parse().unwrap_or_else(|_| "unknown".parse().unwrap()),
+        request_id
+            .parse()
+            .unwrap_or_else(|_| "unknown".parse().unwrap()),
     );
-    response.headers_mut().insert(
-        "X-API-Version",
-        API_VERSION.parse().unwrap(),
-    );
+    response
+        .headers_mut()
+        .insert("X-API-Version", API_VERSION.parse().unwrap());
 
     response
 }
@@ -62,6 +60,9 @@ mod tests {
 
     #[test]
     fn test_openai_compatible_version() {
-        assert!(!OPENAI_COMPATIBLE_VERSION.is_empty(), "OpenAI version should be set");
+        assert!(
+            !OPENAI_COMPATIBLE_VERSION.is_empty(),
+            "OpenAI version should be set"
+        );
     }
 }

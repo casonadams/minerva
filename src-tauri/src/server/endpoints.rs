@@ -1,6 +1,12 @@
-use axum::{Json, extract::{Path, State}, response::IntoResponse};
+use super::server_state::{
+    ModelLoadRequest, ModelOperationResponse, ModelStatsResponse, ServerState,
+};
 use crate::error::MinervaResult;
-use super::server_state::{ServerState, ModelLoadRequest, ModelOperationResponse, ModelStatsResponse};
+use axum::{
+    Json,
+    extract::{Path, State},
+    response::IntoResponse,
+};
 
 #[allow(dead_code)]
 pub async fn health_check_enhanced() -> impl IntoResponse {
@@ -23,9 +29,7 @@ pub async fn readiness_check() -> impl IntoResponse {
 }
 
 #[allow(dead_code)]
-pub async fn metrics_endpoint(
-    State(state): State<ServerState>,
-) -> impl IntoResponse {
+pub async fn metrics_endpoint(State(state): State<ServerState>) -> impl IntoResponse {
     use crate::observability::endpoints::{
         CacheMetrics, ErrorMetrics, MetricsResponse, RequestMetrics, ResponseTimeMetrics,
     };

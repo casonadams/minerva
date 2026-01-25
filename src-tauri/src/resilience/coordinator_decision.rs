@@ -1,7 +1,6 @@
 use super::{
-    circuit_breaker::CircuitBreaker, fallback::FallbackDecision,
+    ErrorClass, circuit_breaker::CircuitBreaker, fallback::FallbackDecision,
     resilience_decision::ResilienceDecision, retry::RetryState, timeout::TimeoutContext,
-    ErrorClass,
 };
 use crate::error::MinervaError;
 
@@ -66,7 +65,9 @@ impl CoordinatorDecision {
 
         // Calculate retry delay if applicable
         let retry_delay_ms = if should_retry {
-            retry_state.clone().map(|mut retry| retry.next_delay().as_millis() as u64)
+            retry_state
+                .clone()
+                .map(|mut retry| retry.next_delay().as_millis() as u64)
         } else {
             None
         };
@@ -93,7 +94,12 @@ mod tests {
         let err = MinervaError::StreamingError("test".to_string());
         let mut retry = None;
 
-        let decision = CoordinatorDecision::decide(DecisionContext { circuit_breaker: &cb, retry_state: &mut retry, timeout_context: &None, error: &err });
+        let decision = CoordinatorDecision::decide(DecisionContext {
+            circuit_breaker: &cb,
+            retry_state: &mut retry,
+            timeout_context: &None,
+            error: &err,
+        });
         assert_eq!(decision.error_class, ErrorClass::Transient);
     }
 
@@ -103,7 +109,12 @@ mod tests {
         let err = MinervaError::InvalidRequest("test".to_string());
         let mut retry = None;
 
-        let decision = CoordinatorDecision::decide(DecisionContext { circuit_breaker: &cb, retry_state: &mut retry, timeout_context: &None, error: &err });
+        let decision = CoordinatorDecision::decide(DecisionContext {
+            circuit_breaker: &cb,
+            retry_state: &mut retry,
+            timeout_context: &None,
+            error: &err,
+        });
         assert_eq!(decision.error_class, ErrorClass::Permanent);
         assert!(decision.should_fail_fast);
     }
@@ -119,7 +130,12 @@ mod tests {
 
         let err = MinervaError::StreamingError("test".to_string());
         let mut retry = None;
-        let decision = CoordinatorDecision::decide(DecisionContext { circuit_breaker: &cb, retry_state: &mut retry, timeout_context: &None, error: &err });
+        let decision = CoordinatorDecision::decide(DecisionContext {
+            circuit_breaker: &cb,
+            retry_state: &mut retry,
+            timeout_context: &None,
+            error: &err,
+        });
 
         assert!(decision.should_fail_fast);
     }
@@ -132,7 +148,12 @@ mod tests {
 
         let err = MinervaError::StreamingError("test".to_string());
         let mut retry = None;
-        let decision = CoordinatorDecision::decide(DecisionContext { circuit_breaker: &cb, retry_state: &mut retry, timeout_context: &Some(ctx), error: &err });
+        let decision = CoordinatorDecision::decide(DecisionContext {
+            circuit_breaker: &cb,
+            retry_state: &mut retry,
+            timeout_context: &Some(ctx),
+            error: &err,
+        });
 
         assert!(decision.should_fail_fast);
     }
@@ -143,7 +164,12 @@ mod tests {
         let err = MinervaError::GpuOutOfMemory("test".to_string());
         let mut retry = None;
 
-        let decision = CoordinatorDecision::decide(DecisionContext { circuit_breaker: &cb, retry_state: &mut retry, timeout_context: &None, error: &err });
+        let decision = CoordinatorDecision::decide(DecisionContext {
+            circuit_breaker: &cb,
+            retry_state: &mut retry,
+            timeout_context: &None,
+            error: &err,
+        });
         assert!(decision.should_fallback);
     }
 }

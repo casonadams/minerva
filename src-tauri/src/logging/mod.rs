@@ -7,7 +7,7 @@
 /// - Error tracking and reporting
 pub mod spans;
 
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 /// Initialize logging system with default configuration
 ///

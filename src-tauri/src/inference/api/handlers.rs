@@ -7,9 +7,7 @@ use super::types::*;
 use crate::error::MinervaResult;
 
 /// Infer single prompt
-pub async fn infer_prompt(
-    _req: InferenceRequest,
-) -> MinervaResult<InferenceResponse> {
+pub async fn infer_prompt(_req: InferenceRequest) -> MinervaResult<InferenceResponse> {
     // TODO: Integrate with UnifiedModelRegistry
     Ok(InferenceResponse {
         id: uuid::Uuid::new_v4().to_string(),
@@ -24,9 +22,7 @@ pub async fn infer_prompt(
 }
 
 /// Load a model
-pub async fn load_model(
-    _req: LoadModelRequest,
-) -> MinervaResult<ModelInfoResponse> {
+pub async fn load_model(_req: LoadModelRequest) -> MinervaResult<ModelInfoResponse> {
     // TODO: Integrate with UnifiedModelRegistry
     Ok(ModelInfoResponse {
         id: "test".to_string(),

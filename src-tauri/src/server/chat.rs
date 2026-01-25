@@ -1,10 +1,7 @@
+use crate::error::MinervaResult;
+use crate::models::{ChatCompletionRequest, ChatCompletionResponse, ChatMessage, Choice, Usage};
 use axum::Json;
 use uuid::Uuid;
-use crate::error::MinervaResult;
-use crate::models::{
-    ChatCompletionRequest, ChatCompletionResponse, Choice,
-    ChatMessage, Usage,
-};
 
 pub async fn create_completion_response(
     req: ChatCompletionRequest,

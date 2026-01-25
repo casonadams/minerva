@@ -1,9 +1,9 @@
 //! API response handling
 
 use super::types::{ApiError, ApiErrorResponse};
+use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 
 /// HTTP response implementation for API errors
 impl IntoResponse for ApiError {

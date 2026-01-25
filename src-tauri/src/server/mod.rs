@@ -6,13 +6,16 @@ pub mod server_state;
 pub mod streaming;
 pub mod validation;
 
-use axum::{Router, routing::{delete, get, post}};
-use tower_http::cors::CorsLayer;
-pub use self::server_state::ServerState;
 use self::endpoints::{
-    health_check_enhanced, readiness_check, metrics_endpoint,
-    load_model, preload_model, unload_model, model_stats,
+    health_check_enhanced, load_model, metrics_endpoint, model_stats, preload_model,
+    readiness_check, unload_model,
 };
+pub use self::server_state::ServerState;
+use axum::{
+    Router,
+    routing::{delete, get, post},
+};
+use tower_http::cors::CorsLayer;
 
 #[allow(dead_code)]
 pub async fn create_server(state: ServerState) -> Router {
@@ -34,9 +37,9 @@ pub async fn create_server(state: ServerState) -> Router {
 mod tests {
     use super::*;
     use crate::models::ChatMessage;
-    use axum::http::HeaderMap;
-    use axum::Json;
     use crate::models::ModelRegistry;
+    use axum::Json;
+    use axum::http::HeaderMap;
 
     #[test]
     fn test_model_registry_empty() {
@@ -94,12 +97,8 @@ mod tests {
         };
 
         let headers = HeaderMap::new();
-        let response = handlers::chat_completions(
-            axum::extract::State(state),
-            headers,
-            Json(req),
-        )
-        .await;
+        let response =
+            handlers::chat_completions(axum::extract::State(state), headers, Json(req)).await;
         assert!(response.is_err());
     }
 }

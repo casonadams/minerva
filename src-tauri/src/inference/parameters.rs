@@ -1,5 +1,5 @@
-use super::parameter_validator::ParameterApplier;
 use super::GenerationConfig;
+use super::parameter_validator::ParameterApplier;
 use crate::error::MinervaResult;
 use crate::models::ChatCompletionRequest;
 
@@ -117,10 +117,12 @@ mod tests {
         let result = ParameterParser::from_request(&req);
 
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("temperature must be between"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("temperature must be between")
+        );
     }
 
     #[test]
@@ -146,10 +148,12 @@ mod tests {
         let result = ParameterParser::from_request(&req);
 
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("max_tokens must be"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("max_tokens must be")
+        );
     }
 
     #[test]
