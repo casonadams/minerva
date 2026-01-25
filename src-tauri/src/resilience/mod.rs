@@ -9,6 +9,7 @@
 pub mod circuit_breaker;
 pub mod circuit_breaker_config;
 pub mod circuit_breaker_facade;
+pub mod circuit_breaker_facade_tests;
 pub mod circuit_breaker_request_handler;
 pub mod circuit_breaker_state_recorder;
 pub mod circuit_breaker_transitions;
