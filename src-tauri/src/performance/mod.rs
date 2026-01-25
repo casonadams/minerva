@@ -23,6 +23,7 @@ pub mod profiler;
 pub mod resource_state;
 pub mod scoped_timer;
 pub mod server_metrics_aggregator;
+pub mod server_metrics_aggregator_tests;
 pub mod window_state;
 
 pub use performance_metrics::PerformanceMetrics;
