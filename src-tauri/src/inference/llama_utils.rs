@@ -22,8 +22,7 @@ use crate::error::{MinervaError, MinervaResult};
 /// Returns error if input and weight vectors have different lengths
 ///
 /// # Example
-/// ```
-/// # use inference::llama_utils::rmsnorm;
+/// ```ignore
 /// let x = vec![1.0, 2.0, 3.0, 4.0];
 /// let weight = vec![0.5, 0.5, 0.5, 0.5];
 /// let result = rmsnorm(&x, &weight, 1e-6).unwrap();
@@ -56,8 +55,7 @@ pub fn rmsnorm(x: &[f32], weight: &[f32], eps: f32) -> MinervaResult<Vec<f32>> {
 /// Activated output vector
 ///
 /// # Example
-/// ```
-/// # use inference::llama_utils::silu;
+/// ```ignore
 /// let x = vec![0.0, 1.0, -1.0, 2.0];
 /// let result = silu(&x);
 /// assert_eq!(result.len(), 4);

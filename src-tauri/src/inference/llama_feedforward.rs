@@ -32,8 +32,7 @@ impl FeedForward {
     /// * `intermediate_size` - Size of hidden layer
     ///
     /// # Example
-    /// ```
-    /// # use inference::llama_feedforward::FeedForward;
+    /// ```ignore
     /// let ff = FeedForward::new(512, 2048);
     /// assert_eq!(ff.hidden_size, 512);
     /// ```

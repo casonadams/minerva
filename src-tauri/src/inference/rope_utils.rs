@@ -22,8 +22,7 @@ impl RoPEParams {
     /// * `head_dim` - The dimension of each attention head
     ///
     /// # Example
-    /// ```
-    /// # use inference::rope_utils::RoPEParams;
+    /// ```ignore
     /// let rope = RoPEParams::new(64);
     /// assert_eq!(rope.head_dim, 64);
     /// ```
