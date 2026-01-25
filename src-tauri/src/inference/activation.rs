@@ -5,8 +5,6 @@
 /// layer outputs.
 ///
 /// GELU activation function
-
-/// GELU activation function
 ///
 /// Gaussian Error Linear Unit: a smooth approximation of ReLU
 /// Formula: x * Φ(x) where Φ is the cumulative normal distribution
