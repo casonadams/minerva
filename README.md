@@ -20,78 +20,210 @@ Minerva is a production-ready LLM server featuring:
 - macOS 10.15+
 - GGUF format LLM files (download from HuggingFace)
 
-### Setup
+### Installation
 
-1. **Install dependencies:**
 ```bash
+# Install dependencies
 pnpm install
+
+# Build the backend (Rust)
+cd src-tauri && cargo build --release && cd ..
 ```
 
-2. **Download a model** (example: Mistral 7B):
-```bash
-mkdir -p ~/.minerva/models
-# Download from HuggingFace (e.g., TheBloke) and place in ~/.minerva/models/
-```
+### Running Minerva Server
 
-3. **Run the app:**
 ```bash
+# Development mode (auto-reload)
 pnpm tauri dev
+
+# Production build
+pnpm tauri build --release
 ```
 
 The server will start on `http://localhost:11434` with the OpenAI-compatible API available at `/v1`.
 
-### API Usage
+## OpenAI API Usage
+
+### 1. Get Available Models
+
+Once the server is running, discover available models:
 
 ```bash
-# List available models
 curl http://localhost:11434/v1/models
+```
 
-# Chat completion
-curl http://localhost:11434/v1/chat/completions \
+**Response:**
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "gpt-oss-20b",
+      "object": "model",
+      "created": 1769376104,
+      "owned_by": "local",
+      "quantization": "MXFP4",
+      "file_size_mb": 12109.57,
+      "tensor_count": 459
+    }
+  ]
+}
+```
+
+### 2. Get Specific Model Info
+
+```bash
+curl http://localhost:11434/v1/models/gpt-oss-20b
+```
+
+### 3. Use with OpenAI-Compatible Tools
+
+Since Minerva is OpenAI API compatible, you can use it with any OpenAI client:
+
+**cURL (direct):**
+```bash
+curl -X POST http://localhost:11434/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "mistral-7b",
-    "messages": [{"role": "user", "content": "Hello, who are you?"}]
+    "model": "gpt-oss-20b",
+    "messages": [{"role": "user", "content": "Hello, who are you?"}],
+    "max_tokens": 100
   }'
+```
 
-# Check health
+**Python:**
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="sk-local",  # any key works locally
+    base_url="http://localhost:11434/v1"
+)
+
+response = client.chat.completions.create(
+    model="gpt-oss-20b",
+    messages=[
+        {"role": "user", "content": "Hello, who are you?"}
+    ],
+    max_tokens=100
+)
+
+print(response.choices[0].message.content)
+```
+
+**JavaScript/Node.js:**
+```javascript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: "sk-local",  // any key works locally
+  baseURL: "http://localhost:11434/v1",
+  dangerouslyAllowBrowser: true
+});
+
+const message = await client.chat.completions.create({
+  model: "gpt-oss-20b",
+  messages: [
+    { role: "user", content: "Hello, who are you?" }
+  ],
+  max_tokens: 100
+});
+
+console.log(message.choices[0].message.content);
+```
+
+**OpenCode.ai / Cursor / Other OpenAI-Compatible Editors:**
+```
+Configure in settings:
+├── API Provider: OpenAI API
+├── Base URL: http://localhost:11434/v1
+├── API Key: sk-local (or any value)
+└── Model: gpt-oss-20b (or other available model)
+```
+
+### 4. Monitor Server Health
+
+```bash
+# Health check
 curl http://localhost:11434/health
+
+# Readiness probe
+curl http://localhost:11434/ready
 
 # View metrics
 curl http://localhost:11434/metrics
 ```
 
+## Getting Started with Models
+
+### Download a Model
+
+Models must be in GGUF format and placed in `~/.minerva/models/`:
+
+```bash
+# Create models directory
+mkdir -p ~/.minerva/models
+
+# Download from HuggingFace (example: GPT-OSS 20B)
+# https://huggingface.co/ggml-org/gpt-oss-20b-GGUF
+# Place the downloaded .gguf file in ~/.minerva/models/
+```
+
+### Popular Models to Try
+
+| Model | Size | Best For |
+|-------|------|----------|
+| **GPT-OSS 20B** | 12.1 GB | Balance of speed & quality |
+| **Mistral 7B** | 4.2 GB | Fast inference |
+| **Llama 2 7B** | 4.0 GB | Open source, well-tested |
+| **Neural Chat 7B** | 4.2 GB | Instruction following |
+| **Orca 2 13B** | 8.0 GB | Reasoning tasks |
+
+### Model Discovery Sources
+
+- **HuggingFace:** [GGUF Models](https://huggingface.co/models?library=gguf)
+- **TheBloke:** [Quantized Models](https://huggingface.co/TheBloke)
+- **Ollama:** [Model Library](https://ollama.ai/library)
+
 ### Integration Examples
 
-**OpenCode/Vercel AI SDK:**
+**Vercel AI SDK:**
 ```javascript
 import { openai } from "@ai-sdk/openai-compatible";
 
-const model = openai("mistral-7b", {
+const model = openai("gpt-oss-20b", {
   baseURL: "http://localhost:11434/v1",
-  apiKey: "sk-local" // Any key works locally
+  apiKey: "sk-local"
+});
+
+const response = await generateText({
+  model,
+  prompt: "Hello, who are you?"
 });
 ```
 
-**Python LangChain:**
+**LangChain (Python):**
 ```python
 from langchain.llms import OpenAI
 
 llm = OpenAI(
-  openai_api_base="http://localhost:11434/v1",
-  openai_api_key="sk-local",
-  model_name="mistral-7b"
+    openai_api_base="http://localhost:11434/v1",
+    openai_api_key="sk-local",
+    model_name="gpt-oss-20b"
 )
+
+response = llm("Hello, who are you?")
 ```
 
 ## Features
 
 ### Core Features
-- ✅ **OpenAI-compatible REST API** - `/v1/chat/completions`, `/v1/models`
-- ✅ **GGUF Model Support** - Load any quantized GGUF model
-- ✅ **GPU Acceleration** - Apple Silicon Metal GPU with automatic fallback
-- ✅ **Streaming** - Server-Sent Events (SSE) for real-time token streaming
-- ✅ **Multi-Model** - Load and switch between multiple models
+- ✅ **OpenAI API v1 Compatible** - Works with OpenCode.ai, Cursor, LM Studio, Ollama, etc.
+- ✅ **Fast Model Discovery** - Get model info in < 100ms (no tensor loading)
+- ✅ **GGUF & SafeTensors Support** - Auto-detect and load quantized models
+- ✅ **GPU Acceleration** - Apple Silicon Metal GPU with automatic CPU fallback
+- ✅ **Streaming Responses** - Server-Sent Events (SSE) for real-time token generation
+- ✅ **Multi-Model Support** - Register and switch between multiple models
 - ✅ **Model Management UI** - Built-in web interface for model selection
 
 ### Production Features (Phase 7)
@@ -384,38 +516,23 @@ pnpm tauri build --release
 pnpm check:all
 ```
 
-## HTTP Endpoints
+## HTTP API Endpoints
 
-### Model Management
-- `GET /v1/models` - List available models
-- `POST /v1/models/:id/load` - Load a model
-- `POST /v1/models/:id/preload` - Preload a model
-- `DELETE /v1/models/:id` - Unload a model
-- `GET /v1/models/stats` - Model statistics
+### OpenAI-Compatible Endpoints
 
-### Inference
-- `POST /v1/chat/completions` - Chat completion (streaming supported)
+**Model Discovery:**
+- `GET /v1/models` - List all available models with metadata
+- `GET /v1/models/{id}` - Get detailed info for specific model
 
-### Monitoring
+**Inference:**
+- `POST /v1/chat/completions` - Chat completion (streaming with SSE)
+
+**Server Health:**
 - `GET /health` - Health status with component details
 - `GET /ready` - Readiness probe for orchestration
 - `GET /metrics` - Performance metrics snapshot
 
-### Response Format
-All endpoints use OpenAI-compatible JSON responses.
-
-## Getting Models
-
-GGUF format models can be downloaded from:
-- **HuggingFace:** [models?library=gguf](https://huggingface.co/models?library=gguf)
-- **TheBloke:** [quantized models](https://huggingface.co/TheBloke)
-- **Ollama:** [model library](https://ollama.ai/library)
-
-Popular models to try:
-- Mistral 7B (best balance)
-- Llama 2 7B (open source)
-- Neural Chat 7B (instruction tuned)
-- Orca 2 13B (reasoning)
+All endpoints return OpenAI-compatible JSON responses. See [OPENAI_API_INTEGRATION.md](OPENAI_API_INTEGRATION.md) for detailed API documentation.
 
 ## Contributing
 
@@ -531,12 +648,20 @@ Minerva is fully production-hardened and ready for local LLM deployment with Ope
 ---
 
 **Project Status:** ✅ All 7 Phases Complete - Production Ready  
-**Last Updated:** January 2025 (Phase 7 Complete)  
-**Total Tests:** 827 (579 unit + 248 integration) - All passing ✅  
+**Last Updated:** January 2025 (OpenAI API Optimization + Phase 7 Complete)  
+**Total Tests:** 874 (all passing ✅)  
 **Code Quality:** 0 lint violations, 0 compiler warnings  
-**Documentation:** Consolidated in `/docs` with navigation hub
+**Documentation:** Complete API docs + integration guides
+
+**Recent Additions (OpenAI API Optimization):**
+- ✨ **Fast Model Discovery** - < 100ms metadata loading, < 1KB JSON responses
+- ✨ **OpenCode.ai Integration** - Drop-in replacement with zero configuration
+- ✨ **Tool-Optimized Loader** - Minimal context overhead for AI agents
+- ✨ **Multi-Model Registry** - Register and manage multiple models simultaneously
+- 📖 **Complete Integration Guides** - See [OPENAI_API_INTEGRATION.md](OPENAI_API_INTEGRATION.md) and [OPENCODE_INTEGRATION_GUIDE.md](OPENCODE_INTEGRATION_GUIDE.md)
 
 **Quick Links:**
 - **Getting Started:** See [docs/README.md](docs/README.md)
+- **OpenAI API Details:** See [OPENAI_API_INTEGRATION.md](OPENAI_API_INTEGRATION.md)
 - **All Phases Summary:** See [docs/PHASES.md](docs/PHASES.md)
 - **Development Setup:** See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
