@@ -18,6 +18,7 @@ pub mod unified_model_registry;
 pub mod batch;
 pub mod batch_async;
 pub mod batch_measurement;
+pub mod baseline_benchmarks;
 pub mod batch_optimized;
 pub mod batch_result_optimized;
 pub mod optimization_utils;
