@@ -8,6 +8,7 @@
 pub mod adaptive;
 pub mod adaptive_adjuster;
 pub mod adaptive_config;
+pub mod adaptive_tests;
 pub mod execution_modes;
 pub mod inference_metrics;
 pub mod inference_metrics_query;
