@@ -15,16 +15,23 @@ too-many-arguments-threshold = 3
 # COMPLEXITY THRESHOLDS (Keep functions simple and understandable)
 # =============================================================================
 
-# Cognitive complexity per function (default: 25, we enforce stricter)
+# Cognitive complexity per function - STRICT ENFORCEMENT
 # Measures how hard a function is to understand
 # Lower = simpler = easier to test and maintain
-# NOTE: This is cognitive complexity, not cyclomatic complexity
-# Cognitive is more nuanced and maps approximately:
-#   Cyclomatic ≤ 3 maps to cognitive ≤ 6-8
-#   Cyclomatic ≤ 5 maps to cognitive ≤ 10-12
-# We use 10 to target M ≤ 3 (new code) while being lenient on legacy code
+# 
+# Cyclomatic Complexity (M) ≤ 3 is our standard:
+#   M ≤ 3 maps to cognitive complexity ≤ 6-8
+#   We enforce cognitive-complexity-threshold = 6 to ensure M ≤ 3
+#
+# Cognitive complexity measures:
+#   - Each if/match branch: +1
+#   - Nested branching: +1 per nesting level
+#   - Loops: +1 each
+#   - Exception handlers: +1
+#
+# Setting to 6 ensures tight control on function complexity
 # Run: cargo clippy -- -W clippy::cognitive-complexity
-cognitive-complexity-threshold = 10
+cognitive-complexity-threshold = 6
 
 # Type complexity threshold (avoid overly complex types)
 # Prevents type-level obfuscation and makes code more readable
@@ -111,39 +118,58 @@ await-holding-invalid-types = [
 # (if x = 5 { ... } likely meant if x == 5 { ... })
 
 # =============================================================================
-# ENGINEERING STANDARDS ALIGNMENT
+# ENGINEERING STANDARDS ALIGNMENT - PHASE 11+ UNIVERSAL COMPLIANCE
 # =============================================================================
 
-# These settings align with the standards defined in docs/ENGINEERING_STANDARDS.md:
+# These settings align with the standards defined in docs/PHASE_11_PLUS_COMPLIANCE.md:
 #
-# Complexity (M ≤ 3):
-#   ✓ cognitive-complexity-threshold = 20 (reasonable bound)
-#   ✓ type-complexity-threshold = 250 (prevent obfuscation)
+# Cyclomatic Complexity (M ≤ 3):
+#   ✅ cognitive-complexity-threshold = 6 (enforces M ≤ 3)
+#   ✅ type-complexity-threshold = 250 (prevent obfuscation)
+#   ✅ NO EXCEPTIONS - applied to ALL code including inference/
+#   ✅ Run: cargo clippy -- -W clippy::cognitive-complexity
 #
-# Dependencies (≤ 2-3 parameters):
-#   ✓ too-many-arguments-threshold = 3 (enforces DI pattern)
+# Parameter Count (≤ 3):
+#   ✅ too-many-arguments-threshold = 3 (enforces DI pattern)
+#   ✅ Automatically enforced via: cargo clippy --all-targets -- -D warnings
 #
 # Function Size (≤ 25 lines):
-#   ✓ Enforced via review, not lint (use clippy-too-many-lines in future)
+#   ✅ Enforced via code review (primary check)
+#   ✅ Use grep to find long functions: grep -n 'fn ' src-tauri/src/**/*.rs
 #
 # File Size (≤ 150 lines):
-#   ✓ Enforced via CI script (see scripts/check-file-lengths.sh)
-#   ✓ Run: ./scripts/check-file-lengths.sh
+#   ✅ Enforced via CI script: ./scripts/check-all-standards.sh
+#   ✅ ALL code enforced (NO EXCEPTIONS for inference/)
+#   ✅ ALL modules must comply (api, bin, cli, inference, etc)
+#   ✅ Pre-commit hook prevents non-compliant commits
 #
-# Testing:
-#   ✓ allow-expect-in-tests = true (allows panic assertions)
-#   ✓ allow-unwrap-in-tests = true (allows test ergonomics)
+# Code Quality:
+#   ✅ allow-expect-in-tests = true (allows panic assertions in tests)
+#   ✅ allow-unwrap-in-tests = true (allows test ergonomics)
+#   ✅ All warnings treated as errors: -- -D warnings
 #
 # =============================================================================
-# USAGE
+# USAGE - ENFORCEMENT COMMANDS
 # =============================================================================
 
 # This file is automatically read from the workspace root.
-# Run clippy normally:
-#   cargo clippy --all-targets
+
+# Run clippy with all standards enforced:
+#   cargo clippy --all-targets --all-features -- -D warnings
 #
-# Enforce specific lint:
+# Enforce parameter count (≤ 3):
 #   cargo clippy --all-targets -- -D clippy::too-many-arguments
 #
-# Check violations:
-#   See docs/CLIPPY_VIOLATIONS.md for current violations and fixes
+# Enforce cyclomatic complexity (M ≤ 3, cognitive ≤ 6):
+#   cargo clippy -- -W clippy::cognitive-complexity
+#
+# Check all standards via CI script:
+#   ./scripts/check-all-standards.sh
+#   pnpm lint
+#
+# Full local pre-commit verification:
+#   ./.git/hooks/pre-commit
+#
+# Current violations:
+#   Run: find src-tauri/src -name "*.rs" -exec wc -l {} \; | sort -rn | head -20
+#   These files must be refactored to ≤ 150 lines
