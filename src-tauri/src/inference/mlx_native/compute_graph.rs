@@ -10,6 +10,9 @@ pub enum Operation {
     LayerNorm { eps: f32 },
     Softmax,
     Attention { scale: f32 },
+    FusedLinearAdd { shape: (usize, usize) },
+    FusedLinearGelu { shape: (usize, usize) },
+    FusedLinearAddGelu { shape: (usize, usize) },
 }
 
 #[derive(Clone)]

@@ -7,17 +7,33 @@
 /// 1. Model Loader (DONE) - Load SafeTensors from HuggingFace
 /// 2. Unified Memory (DONE) - CPU/GPU memory abstraction
 /// 3. KV Quantization (DONE) - 8x memory savings for KV cache
-/// 4. Compute Graphs (IN PROGRESS) - Operation fusion and optimization
+/// 4. Compute Graphs (DONE) - Graph structure and execution
+/// 4B. Operation Fusion (IN PROGRESS) - Operation fusion and optimization
 /// 5. Metal GPU - Apple Metal acceleration
 pub mod compute_graph;
 pub mod compute_ops;
 pub mod config;
 pub mod graph_executor;
+#[cfg(test)]
+mod graph_executor_tests;
+pub mod graph_fusion;
+pub mod graph_fusion_ops;
+#[cfg(test)]
+mod graph_fusion_ops_tests;
+#[cfg(test)]
+mod graph_fusion_tests;
+pub mod graph_optimizer;
+#[cfg(test)]
+mod graph_optimizer_tests;
 pub mod kv_quantization;
 mod kv_quantization_helpers;
 #[cfg(test)]
 mod kv_quantization_test;
 pub mod loader;
+#[cfg(test)]
+mod phase4b_e2e_tests;
+#[cfg(test)]
+mod phase4b_integration_tests;
 pub mod unified_memory;
 
 pub use config::GPTOSSConfig;

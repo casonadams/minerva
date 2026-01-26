@@ -1,6 +1,8 @@
 use super::compute_graph::Operation;
+use super::graph_fusion_ops::{
+    FusedLinearAddGeluOp, FusedLinearAddOp, FusedLinearGeluOp, FusedOpExecutor,
+};
 use super::unified_memory::MLXArray;
-use std::collections::HashMap;
 
 pub trait OpExecutor {
     fn execute(&self, inputs: &[&MLXArray]) -> MLXArray;
@@ -95,6 +97,18 @@ pub fn execute_op(op: &Operation, inputs: &[&MLXArray]) -> MLXArray {
         Operation::Softmax => SoftmaxExecutor.execute(inputs),
         Operation::MatMul { shape } => MatMulExecutor { shape: *shape }.execute(inputs),
         Operation::Attention { .. } => panic!("Attention not yet implemented"),
+        Operation::FusedLinearAdd { shape } => FusedLinearAddOp {
+            matmul_shape: *shape,
+        }
+        .execute(inputs),
+        Operation::FusedLinearGelu { shape } => FusedLinearGeluOp {
+            matmul_shape: *shape,
+        }
+        .execute(inputs),
+        Operation::FusedLinearAddGelu { shape } => FusedLinearAddGeluOp {
+            matmul_shape: *shape,
+        }
+        .execute(inputs),
     }
 }
 
