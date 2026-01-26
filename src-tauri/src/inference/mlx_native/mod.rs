@@ -7,9 +7,12 @@
 /// 1. Model Loader (DONE) - Load SafeTensors from HuggingFace
 /// 2. Unified Memory (DONE) - CPU/GPU memory abstraction
 /// 3. KV Quantization (DONE) - 8x memory savings for KV cache
-/// 4. Compute Graphs - Operation fusion and optimization
+/// 4. Compute Graphs (IN PROGRESS) - Operation fusion and optimization
 /// 5. Metal GPU - Apple Metal acceleration
+pub mod compute_graph;
+pub mod compute_ops;
 pub mod config;
+pub mod graph_executor;
 pub mod kv_quantization;
 mod kv_quantization_helpers;
 #[cfg(test)]
