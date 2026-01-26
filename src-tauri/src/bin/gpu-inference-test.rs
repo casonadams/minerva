@@ -75,7 +75,9 @@ fn main() {
     println!();
     println!("To run full inference test:");
     println!("  cd src-tauri");
-    println!("  cargo test --lib inference::gpu::backend::tests::test_backend_creation -- --ignored --nocapture 2>&1");
+    println!(
+        "  cargo test --lib inference::gpu::backend::tests::test_backend_creation -- --ignored --nocapture 2>&1"
+    );
     println!();
     println!("This will load the actual SafeTensors model and measure forward pass timing.");
 }

@@ -38,6 +38,10 @@ path = "src/bin/verify-safetensors.rs"
 name = "verify-mlx"
 path = "src/bin/verify-mlx.rs"
 
+[[bin]]
+name = "real-benchmark"
+path = "src/bin/real-benchmark.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -49,7 +53,7 @@ criterion = { version = "0.5", features = ["html_reports"] }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
 axum = "0.7"
 tower = "0.4"
@@ -73,7 +77,7 @@ rayon = "1.7"
 async-trait = "0.1"
 dashmap = "5.5"
 rand = "0.8"
-safetensors = "0.4"
+safetensors = "0.3"
 ndarray = "0.15"
 reqwest = { version = "0.11", features = ["stream", "cookies"] }
 indicatif = "0.17"
