@@ -45,6 +45,8 @@ pub mod metal_stubs;
 mod phase4b_e2e_tests;
 #[cfg(test)]
 mod phase4b_integration_tests;
+#[cfg(test)]
+mod phase5_integration_tests;
 pub mod unified_memory;
 
 pub use config::GPTOSSConfig;
