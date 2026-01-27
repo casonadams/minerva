@@ -49,8 +49,8 @@ mod integration_tests {
         let gpu = Arc::new(MetalGPU::new().unwrap());
         let pool = BufferPool::new(gpu, 10 * 1024);
 
-        let buf1 = pool.allocate(1024).unwrap();
-        let buf2 = pool.allocate(2048).unwrap();
+        let _buf1 = pool.allocate(1024).unwrap();
+        let _buf2 = pool.allocate(2048).unwrap();
 
         let stats = pool.statistics();
         assert!(stats.total_allocated >= 3072);

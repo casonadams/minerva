@@ -13,6 +13,8 @@
 pub mod compute_graph;
 pub mod compute_ops;
 pub mod config;
+#[cfg(test)]
+mod gpu_benchmarks;
 pub mod gpu_buffer;
 pub mod gpu_buffer_pool;
 #[cfg(test)]
