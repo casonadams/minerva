@@ -6,10 +6,10 @@ mod tests {
     };
 
     #[test]
-    fn test_optimize_linear_add() {
+    fn test_optimize_detects_fusion() {
         let mut graph = ComputeGraph::new();
         let matmul_id = graph.add_node(Operation::MatMul { shape: (10, 10) }, vec![0]);
-        let add_id = graph.add_node(Operation::Add, vec![matmul_id, 1]);
+        let _add_id = graph.add_node(Operation::Add, vec![matmul_id, 1]);
 
         let optimized = GraphOptimizer::optimize(&graph);
 
@@ -32,11 +32,11 @@ mod tests {
     }
 
     #[test]
-    fn test_optimize_linear_add_gelu() {
+    fn test_optimize_fuses_linear_add_gelu() {
         let mut graph = ComputeGraph::new();
         let matmul_id = graph.add_node(Operation::MatMul { shape: (10, 10) }, vec![0]);
         let add_id = graph.add_node(Operation::Add, vec![matmul_id, 1]);
-        let gelu_id = graph.add_node(Operation::Gelu, vec![add_id]);
+        let _gelu_id = graph.add_node(Operation::Gelu, vec![add_id]);
 
         let optimized = GraphOptimizer::optimize(&graph);
 

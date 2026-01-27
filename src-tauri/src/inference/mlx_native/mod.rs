@@ -8,11 +8,17 @@
 /// 2. Unified Memory (DONE) - CPU/GPU memory abstraction
 /// 3. KV Quantization (DONE) - 8x memory savings for KV cache
 /// 4. Compute Graphs (DONE) - Graph structure and execution
-/// 4B. Operation Fusion (IN PROGRESS) - Operation fusion and optimization
-/// 5. Metal GPU - Apple Metal acceleration
+/// 4B. Operation Fusion (DONE) - Operation fusion and optimization
+/// 5. Metal GPU (IN PROGRESS) - Apple Metal acceleration
 pub mod compute_graph;
 pub mod compute_ops;
 pub mod config;
+pub mod gpu_buffer;
+pub mod gpu_buffer_pool;
+#[cfg(test)]
+mod gpu_buffer_pool_tests;
+pub mod gpu_execution_helpers;
+pub mod gpu_graph_executor;
 pub mod graph_executor;
 #[cfg(test)]
 mod graph_executor_tests;
@@ -30,6 +36,11 @@ mod kv_quantization_helpers;
 #[cfg(test)]
 mod kv_quantization_test;
 pub mod loader;
+pub mod metal_gpu;
+#[cfg(test)]
+mod metal_gpu_tests;
+pub mod metal_kernels_wrapper;
+pub mod metal_stubs;
 #[cfg(test)]
 mod phase4b_e2e_tests;
 #[cfg(test)]

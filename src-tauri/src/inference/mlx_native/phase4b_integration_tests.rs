@@ -28,7 +28,7 @@ mod integration_tests {
         );
 
         let naive_results = Executor::execute(&naive_graph, &inputs);
-        let naive_output = naive_results[&gelu1].data().clone();
+        let _naive_output = naive_results[&gelu1].data().clone();
 
         let optimized_graph = GraphOptimizer::optimize(&naive_graph);
         let optimized_results = Executor::execute(&optimized_graph, &inputs);
